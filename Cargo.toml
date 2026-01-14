@@ -1,0 +1,16 @@
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
+[workspace]
+resolver = "2"
+members = ["packages/bins/*", "packages/libs/*"]
+
+[workspace.dependencies]
+persona-core = { path = "packages/libs/persona-core" }
+clap = "4.5.54"
+
+[workspace.package]
+rust-version = "1.85.0"
+version = "0.1.0"
+edition = "2024"

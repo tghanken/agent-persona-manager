@@ -1,0 +1,9 @@
+[dependencies]
+persona-core = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+
+[package]
+name = "persona"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
