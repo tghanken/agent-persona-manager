@@ -28,9 +28,11 @@
     };
   };
 
-  outputs = inputs:
-    inputs.blueprint {
+  outputs = inputs: let
+    flake = inputs.blueprint {
       inherit inputs;
       prefix = "nix/";
     };
+  in
+    flake;
 }
