@@ -1,21 +1,26 @@
-{pkgs, ...}:
-pkgs.stdenv.mkDerivation {
-  name = "validate-skills";
-  src = pkgs.lib.fileset.toSource {
-    root = ../..;
-    fileset = pkgs.lib.fileset.unions [
-      ../../nix/scripts/validate_skills.py
-      ../../.agent/skills
-    ];
-  };
+{
+  pkgs,
+  inputs,
+  ...
+}: let
+  persona-cli = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.persona-cli;
+in
+  pkgs.stdenv.mkDerivation {
+    name = "validate-skills";
+    src = pkgs.lib.fileset.toSource {
+      root = ../..;
+      fileset = pkgs.lib.fileset.unions [
+        ../../.agent
+      ];
+    };
 
-  buildInputs = [pkgs.python3];
+    nativeBuildInputs = [persona-cli];
 
-  dontBuild = true;
+    dontBuild = true;
 
-  installPhase = ''
-    mkdir -p $out
-    python3 nix/scripts/validate_skills.py
-    touch $out/pass
-  '';
-}
+    installPhase = ''
+      mkdir -p $out
+      persona check
+      touch $out/pass
+    '';
+  }
