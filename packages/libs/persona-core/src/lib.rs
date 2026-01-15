@@ -16,8 +16,8 @@ pub enum PersonaError {
     Io(#[from] std::io::Error),
 }
 
-#[tracing::instrument(skip(writer))]
-pub fn list_files(dir: &str, mut writer: impl std::io::Write) -> Result<(), PersonaError> {
+#[tracing::instrument]
+pub fn list_files(dir: &str) -> Result<Vec<std::path::PathBuf>, PersonaError> {
     use std::path::Path;
     use walkdir::WalkDir;
 
@@ -26,10 +26,22 @@ pub fn list_files(dir: &str, mut writer: impl std::io::Write) -> Result<(), Pers
         return Err(PersonaError::DirectoryNotFound(dir.to_string()));
     }
 
+    let mut files = Vec::new();
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file() {
-            writeln!(writer, "{}", entry.path().display())?;
+            files.push(entry.path().to_path_buf());
         }
+    }
+    Ok(files)
+}
+
+#[tracing::instrument(skip(writer))]
+pub fn print_files(
+    files: &[std::path::PathBuf],
+    mut writer: impl std::io::Write,
+) -> std::io::Result<()> {
+    for file in files {
+        writeln!(writer, "{}", file.display())?;
     }
     Ok(())
 }
@@ -65,21 +77,31 @@ mod tests {
         fs::create_dir(&sub_dir).unwrap();
         fs::write(&file2, "content").unwrap();
 
-        let mut output = Vec::new();
-        list_files(temp_dir.to_str().unwrap(), &mut output).unwrap();
+        let files = list_files(temp_dir.to_str().unwrap()).unwrap();
 
-        let output_str = String::from_utf8(output).unwrap();
-        assert!(output_str.contains(file1.to_str().unwrap()));
-        assert!(output_str.contains(file2.to_str().unwrap()));
+        assert!(files.contains(&file1));
+        assert!(files.contains(&file2));
 
         // Cleanup
         fs::remove_dir_all(&temp_dir).unwrap();
     }
 
     #[test]
-    fn test_list_files_non_existent() {
+    fn test_print_files() {
+        let files = vec![
+            std::path::PathBuf::from("file1.txt"),
+            std::path::PathBuf::from("file2.txt"),
+        ];
         let mut output = Vec::new();
-        let result = list_files("non_existent_directory_xyz", &mut output);
+        print_files(&files, &mut output).unwrap();
+        let output_str = String::from_utf8(output).unwrap();
+        assert!(output_str.contains("file1.txt"));
+        assert!(output_str.contains("file2.txt"));
+    }
+
+    #[test]
+    fn test_list_files_non_existent() {
+        let result = list_files("non_existent_directory_xyz");
         assert!(result.is_err());
     }
 }

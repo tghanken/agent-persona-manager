@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use persona_core::{hello, list_files, validate};
+use persona_core::{hello, list_files, print_files, validate};
 
 #[derive(Parser)]
 #[command(version, name = "persona", about = "Persona CLI", long_about = None)]
@@ -27,7 +27,8 @@ fn main() -> anyhow::Result<()> {
             validate();
         }
         Some(Commands::List { dir }) => {
-            list_files(dir, std::io::stdout())?;
+            let files = list_files(dir)?;
+            print_files(&files, std::io::stdout())?;
         }
         None => {
             hello();
