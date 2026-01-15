@@ -1,6 +1,7 @@
 pub mod handlers;
 
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -11,7 +12,7 @@ use clap::{Parser, Subcommand};
 )]
 pub struct Cli {
     #[arg(short, long, global = true)]
-    pub input: Vec<String>,
+    pub input: Vec<PathBuf>,
 
     #[arg(short, long, action = clap::ArgAction::Count, global = true)]
     pub verbose: u8,
@@ -20,7 +21,7 @@ pub struct Cli {
     pub output: Option<String>,
 
     #[command(subcommand)]
-    pub command: Option<Commands>,
+    pub command: Commands,
 }
 
 #[derive(Subcommand, Debug, PartialEq)]
@@ -47,7 +48,7 @@ mod tests {
     fn test_check_command_parsing() {
         let cli = Cli::parse_from(["persona", "check"]);
         match cli.command {
-            Some(Commands::Check) => (),
+            Commands::Check => (),
             _ => panic!("Expected Check command"),
         }
     }
@@ -56,7 +57,7 @@ mod tests {
     fn test_list_command_parsing() {
         let cli = Cli::parse_from(["persona", "list"]);
         match cli.command {
-            Some(Commands::List) => (),
+            Commands::List => (),
             _ => panic!("Expected List command"),
         }
     }
@@ -65,23 +66,38 @@ mod tests {
     fn test_build_command_parsing() {
         let cli = Cli::parse_from(["persona", "build"]);
         match cli.command {
-            Some(Commands::Build) => (),
+            Commands::Build => (),
             _ => panic!("Expected Build command"),
         }
     }
 
     #[test]
-    fn test_default_command_parsing() {
-        let cli = Cli::parse_from(["persona"]);
-        assert!(cli.command.is_none());
+    fn test_global_args() {
+        let cli = Cli::parse_from(["persona", "-i", "dir1", "-i", "dir2", "-v", "-o", "out", "build"]);
+        assert_eq!(cli.input, vec![PathBuf::from("dir1"), PathBuf::from("dir2")]);
+        assert_eq!(cli.verbose, 1);
+        assert_eq!(cli.output, Some("out".to_string()));
+        match cli.command {
+            Commands::Build => (),
+            _ => panic!("Expected Build command"),
+        }
     }
 
     #[test]
-    fn test_global_args() {
-        let cli = Cli::parse_from(["persona", "-i", "dir1", "-i", "dir2", "-v", "-o", "out"]);
-        assert_eq!(cli.input, vec!["dir1", "dir2"]);
-        assert_eq!(cli.verbose, 1);
-        assert_eq!(cli.output, Some("out".to_string()));
-        assert!(cli.command.is_none());
+    fn test_input_arg() {
+        let cli = Cli::parse_from(["persona", "-i", "test_dir", "list"]);
+        assert_eq!(cli.input, vec![PathBuf::from("test_dir")]);
+    }
+
+    #[test]
+    fn test_verbose_arg() {
+        let cli = Cli::parse_from(["persona", "-vv", "check"]);
+        assert_eq!(cli.verbose, 2);
+    }
+
+    #[test]
+    fn test_output_arg() {
+        let cli = Cli::parse_from(["persona", "-o", "output_dir", "build"]);
+        assert_eq!(cli.output, Some("output_dir".to_string()));
     }
 }

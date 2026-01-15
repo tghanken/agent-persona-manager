@@ -1,21 +1,30 @@
 use persona_core::{list_files, print_files, validate};
+use std::path::PathBuf;
+use tracing::Level;
 
 use crate::cli::{Cli, Commands};
 
 #[tracing::instrument(skip(cli))]
 pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
+    // Initialize tracing based on verbosity
+    let log_level = match cli.verbose {
+        0 => Level::INFO,
+        1 => Level::DEBUG,
+        _ => Level::TRACE,
+    };
+
+    tracing_subscriber::fmt()
+        .with_max_level(log_level)
+        .init();
+
     match cli.command {
-        Some(Commands::Check) => {
+        Commands::Check => {
             handle_check_command(&cli.input)?;
         }
-        Some(Commands::List) => {
+        Commands::List => {
             handle_list_command(&cli.input)?;
         }
-        Some(Commands::Build) => {
-            handle_build_command(&cli.input, cli.output.as_deref())?;
-        }
-        None => {
-            // Default command is Build
+        Commands::Build => {
             handle_build_command(&cli.input, cli.output.as_deref())?;
         }
     }
@@ -23,20 +32,21 @@ pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
 }
 
 #[tracing::instrument]
-fn handle_list_command(inputs: &[String]) -> anyhow::Result<()> {
+fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
     let mut all_files = Vec::new();
 
     // If no inputs are provided, default to ".agent"
     let inputs_to_use = if inputs.is_empty() {
-        vec![".agent".to_string()]
+        vec![PathBuf::from(".agent")]
     } else {
         inputs.to_vec()
     };
 
     for dir in &inputs_to_use {
-        match list_files(dir) {
+        let dir_str = dir.to_string_lossy();
+        match list_files(&dir_str) {
             Ok(files) => all_files.extend(files),
-            Err(e) => tracing::warn!("Error listing files in {}: {}", dir, e),
+            Err(e) => tracing::warn!("Error listing files in {}: {}", dir_str, e),
         }
     }
     print_files(&all_files, std::io::stdout())?;
@@ -44,7 +54,7 @@ fn handle_list_command(inputs: &[String]) -> anyhow::Result<()> {
 }
 
 #[tracing::instrument]
-fn handle_check_command(_inputs: &[String]) -> anyhow::Result<()> {
+fn handle_check_command(_inputs: &[PathBuf]) -> anyhow::Result<()> {
     // Current validate implementation in core doesn't take arguments.
     // It's a stub. We just call it.
     validate();
@@ -52,7 +62,7 @@ fn handle_check_command(_inputs: &[String]) -> anyhow::Result<()> {
 }
 
 #[tracing::instrument]
-fn handle_build_command(inputs: &[String], output: Option<&str>) -> anyhow::Result<()> {
+fn handle_build_command(inputs: &[PathBuf], output: Option<&str>) -> anyhow::Result<()> {
     // Stub implementation
     // In a real implementation, this would read inputs and generate AGENTS.md
     println!("Building agent knowledge summary...");
