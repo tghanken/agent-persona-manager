@@ -1,3 +1,8 @@
+[dependencies]
+thiserror = "2"
+tracing = { workspace = true }
+walkdir = "2"
+
 [package]
 name = "persona-core"
 version = { workspace = true }
