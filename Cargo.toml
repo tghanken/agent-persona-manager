@@ -8,7 +8,7 @@ members = ["packages/bins/*", "packages/libs/*"]
 
 [workspace.dependencies]
 persona-core = { path = "packages/libs/persona-core" }
-clap = "4.5.54"
+tracing = "^0.1.44"
 
 [workspace.package]
 rust-version = "1.85.0"
