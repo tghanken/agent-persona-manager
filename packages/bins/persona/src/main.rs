@@ -18,7 +18,7 @@ enum Commands {
 }
 
 #[tracing::instrument]
-fn main() {
+fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let cli = Cli::parse();
 
@@ -27,19 +27,13 @@ fn main() {
             validate();
         }
         Some(Commands::List { dir }) => {
-            if let Err(_e) = list_files(dir, std::io::stdout()) {
-                // tracing::error! is already called inside list_files for directory not found,
-                // but we might want to log other IO errors here or just exit.
-                // For now, list_files handles the specific error case with logging.
-                // If we get an error here, it's propagated.
-                // We can use the error to set exit code if needed.
-                std::process::exit(1);
-            }
+            list_files(dir, std::io::stdout())?;
         }
         None => {
             hello();
         }
     }
+    Ok(())
 }
 #[cfg(test)]
 mod tests {

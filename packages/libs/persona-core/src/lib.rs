@@ -8,17 +8,22 @@ pub fn validate() {
     println!("Validating...");
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum PersonaError {
+    #[error("Directory '{0}' does not exist")]
+    DirectoryNotFound(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
 #[tracing::instrument(skip(writer))]
-pub fn list_files(dir: &str, mut writer: impl std::io::Write) -> std::io::Result<()> {
+pub fn list_files(dir: &str, mut writer: impl std::io::Write) -> Result<(), PersonaError> {
     use std::path::Path;
     use walkdir::WalkDir;
 
     if !Path::new(dir).exists() {
         tracing::error!("Directory '{}' does not exist.", dir);
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("Directory '{}' does not exist.", dir),
-        ));
+        return Err(PersonaError::DirectoryNotFound(dir.to_string()));
     }
 
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
