@@ -1,6 +1,8 @@
 [dependencies]
 persona-core = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 [package]
 name = "persona"
