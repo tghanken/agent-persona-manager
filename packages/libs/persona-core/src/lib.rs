@@ -1,11 +1,14 @@
+#[tracing::instrument]
 pub fn hello() {
     println!("Hello, world!");
 }
 
+#[tracing::instrument]
 pub fn validate() {
     println!("Validating...");
 }
 
+#[tracing::instrument(skip(writer))]
 pub fn list_files(dir: &str, mut writer: impl std::io::Write) -> std::io::Result<()> {
     use std::path::Path;
     use walkdir::WalkDir;

@@ -17,6 +17,7 @@ enum Commands {
     },
 }
 
+#[tracing::instrument]
 fn main() {
     tracing_subscriber::fmt::init();
     let cli = Cli::parse();
