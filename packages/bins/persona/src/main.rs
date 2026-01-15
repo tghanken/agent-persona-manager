@@ -27,13 +27,19 @@ fn main() -> anyhow::Result<()> {
             validate();
         }
         Some(Commands::List { dir }) => {
-            let files = list_files(dir)?;
-            print_files(&files, std::io::stdout())?;
+            handle_list_command(dir)?;
         }
         None => {
             hello();
         }
     }
+    Ok(())
+}
+
+#[tracing::instrument]
+fn handle_list_command(dir: &str) -> anyhow::Result<()> {
+    let files = list_files(dir)?;
+    print_files(&files, std::io::stdout())?;
     Ok(())
 }
 #[cfg(test)]
