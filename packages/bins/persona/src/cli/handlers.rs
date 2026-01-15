@@ -8,14 +8,15 @@ use crate::cli::{Cli, Commands};
 pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
     // Initialize tracing based on verbosity
     let log_level = match cli.verbose {
-        0 => Level::INFO,
-        1 => Level::DEBUG,
+        0 => Level::WARN,
+        1 => Level::INFO,
+        2 => Level::DEBUG,
         _ => Level::TRACE,
     };
 
-    tracing_subscriber::fmt()
+    let _ = tracing_subscriber::fmt()
         .with_max_level(log_level)
-        .init();
+        .try_init();
 
     match cli.command {
         Commands::Check => {
@@ -24,8 +25,8 @@ pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
         Commands::List => {
             handle_list_command(&cli.input)?;
         }
-        Commands::Build => {
-            handle_build_command(&cli.input, cli.output.as_deref())?;
+        Commands::Build { output } => {
+            handle_build_command(&cli.input, output.as_deref())?;
         }
     }
     Ok(())
@@ -62,12 +63,15 @@ fn handle_check_command(_inputs: &[PathBuf]) -> anyhow::Result<()> {
 }
 
 #[tracing::instrument]
-fn handle_build_command(inputs: &[PathBuf], output: Option<&str>) -> anyhow::Result<()> {
+fn handle_build_command(
+    inputs: &[PathBuf],
+    output: Option<&std::path::Path>,
+) -> anyhow::Result<()> {
     // Stub implementation
     // In a real implementation, this would read inputs and generate AGENTS.md
     println!("Building agent knowledge summary...");
     if let Some(out) = output {
-        println!("Output directory: {}", out);
+        println!("Output directory: {}", out.display());
     }
     if !inputs.is_empty() {
         println!("Inputs: {:?}", inputs);
