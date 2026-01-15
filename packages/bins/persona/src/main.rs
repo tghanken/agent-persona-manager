@@ -1,11 +1,11 @@
 use clap::{Parser, Subcommand};
-use persona_core::{hello, list_files, print_files, validate};
+use persona::{handle_list_command, handle_validate_command};
 
 #[derive(Parser)]
 #[command(version, name = "persona", about = "Persona CLI", long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 }
 
 #[derive(Subcommand)]
@@ -23,23 +23,13 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Check) => {
-            validate();
+        Commands::Check => {
+            handle_validate_command()?;
         }
-        Some(Commands::List { dir }) => {
+        Commands::List { dir } => {
             handle_list_command(dir)?;
         }
-        None => {
-            hello();
-        }
     }
-    Ok(())
-}
-
-#[tracing::instrument]
-fn handle_list_command(dir: &str) -> anyhow::Result<()> {
-    let files = list_files(dir)?;
-    print_files(&files, std::io::stdout())?;
     Ok(())
 }
 #[cfg(test)]
@@ -55,7 +45,7 @@ mod tests {
     #[test]
     fn test_check_command_parsing() {
         let cli = Cli::parse_from(["persona", "check"]);
-        if let Some(Commands::Check) = cli.command {
+        if let Commands::Check = cli.command {
             // Worked
         } else {
             panic!("Failed to parse check command");
