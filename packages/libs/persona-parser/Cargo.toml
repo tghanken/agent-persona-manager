@@ -1,10 +1,11 @@
-[package]
-name = "persona-parser"
-version = "0.1.0"
-edition = "2021"
-
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-thiserror = "2"
+thiserror = { workspace = true }
 tracing = "0.1"
+
+[package]
+name = "persona-parser"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }

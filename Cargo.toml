@@ -8,6 +8,8 @@ members = ["packages/bins/*", "packages/libs/*"]
 
 [workspace.dependencies]
 persona-core = { path = "packages/libs/persona-core" }
+persona-parser = { path = "packages/libs/persona-parser" }
+thiserror = "2"
 tracing = "^0.1.44"
 
 [workspace.package]
