@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use persona_core::{hello, validate};
+use persona_core::{hello, list_files, validate};
 
 #[derive(Parser)]
 #[command(version, name = "persona", about = "Persona CLI", long_about = None)]
@@ -11,6 +11,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Check,
+    List {
+        #[arg(default_value = ".agent")]
+        dir: String,
+    },
 }
 
 fn main() {
@@ -19,6 +23,9 @@ fn main() {
     match &cli.command {
         Some(Commands::Check) => {
             validate();
+        }
+        Some(Commands::List { dir }) => {
+            list_files(dir);
         }
         None => {
             hello();
