@@ -1,63 +1,57 @@
-# Skill Input Format Specification
+# Input Format Specification
 
-This document specifies the expected format for agent skills provided as input to the Agent Knowledge Manager.
+This document specifies the expected format for agent knowledge entities (Skills, Personas, Rules, etc.) provided as input to the Agent Knowledge Manager.
 
 ## Directory Structure
 
-The input directory contains a collection of skill directories. Each skill is contained within its own directory and must have a `SKILL.md` file.
+The input organization relies on directory structure to define categories and subcategories. The tool traverses the input directories to find entity definitions.
 
 ```
 input-directory/
-├── skill-name-1/
-│   ├── SKILL.md          # Required
-│   ├── scripts/          # Optional: Executable code
-│   ├── references/       # Optional: Documentation
-│   └── assets/           # Optional: Static resources
-└── skill-name-2/
-    └── SKILL.md
+├── category/               # e.g., "skills", "personas"
+│   ├── subcategory/        # Optional: e.g., "coding", "finance" (can be nested)
+│   │   ├── entity-name/
+│   │   │   ├── DEFINITION.md   # Required (e.g., SKILL.md, PERSONA.md)
+│   │   │   ├── scripts/        # Optional
+│   │   │   └── ...
+│   │   └── entity-name-2/
+│   │       └── ...
+│   └── entity-name-3/
+│       └── ...
+└── ...
 ```
 
-## SKILL.md Format
+## Definition File Format
 
-The `SKILL.md` file consists of YAML frontmatter followed by a Markdown body.
+Each entity directory must contain a Markdown file with YAML frontmatter. The filename conventions (e.g., `SKILL.md`, `PERSONA.md`) may vary by category, but the format is consistent.
 
 ### Frontmatter
 
-The YAML frontmatter contains metadata about the skill.
+The YAML frontmatter contains metadata about the entity. All fields present in the frontmatter will be parsed and included in the output.
 
 ```yaml
 ---
-name: skill-name
-description: A description of what this skill does.
-license: MIT
-compatibility: Optional compatibility string
-metadata:
-  key: value
-allowed-tools: tool1 tool2
+name: entity-name
+description: A description of what this entity represents.
+# ... other fields as needed (e.g., license, compatibility, etc.)
 ---
 ```
 
-#### Fields
+#### Common Fields
 
 | Field | Required | Description | Constraints |
 |---|---|---|---|
-| `name` | Yes | The name of the skill. | 1-64 chars, lowercase alphanumeric and hyphens. Must match parent directory name. |
-| `description` | Yes | Description of the skill. | 1-1024 chars. Non-empty. |
-| `license` | No | License information. | |
-| `compatibility` | No | Environment requirements. | Max 500 chars. |
-| `metadata` | No | Custom key-value pairs. | Map of string to string. |
-| `allowed-tools` | No | Pre-approved tools. | Space-delimited list. |
+| `name` | Yes | The name of the entity. | 1-64 chars, lowercase alphanumeric and hyphens. Must match parent directory name. |
+| `description` | Yes | Description of the entity. | Non-empty string. |
 
 ### Body
 
-The body of the `SKILL.md` contains the instructions for the agent. It can include:
-- Step-by-step instructions
-- Examples
-- References to other files (scripts, docs) using relative paths.
+The body of the markdown file contains the content/instructions for the entity.
 
 ## Validation Rules
 
-1.  **Existence**: `SKILL.md` must exist in each skill directory.
-2.  **Frontmatter**: Must be valid YAML and contain required fields (`name`, `description`).
-3.  **Naming**: `name` must match the directory name and follow the regex `^[a-z0-9]+(-[a-z0-9]+)*$`.
-4.  **Lengths**: Field constraints (e.g., max 64 chars for name) must be respected.
+1.  **Structure**: Entities must be contained in their own directory matching their `name`.
+2.  **Existence**: A valid definition markdown file must exist in the entity directory.
+3.  **Frontmatter**: Must be valid YAML and contain required fields (`name`, `description`).
+4.  **Consistency**: The `name` field must match the parent directory name.
+5.  **Strict Mode**: Any parsing error or validation failure in the scanned directories causes the process to fail.
