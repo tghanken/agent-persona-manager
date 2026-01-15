@@ -18,12 +18,11 @@ input-directory/
 │   │       └── ...
 │   └── entity-name-3/
 │       └── ...
-└── ...
 ```
 
 ## Definition File Format
 
-Each entity directory must contain a Markdown file with YAML frontmatter. The filename conventions (e.g., `SKILL.md`, `PERSONA.md`) may vary by category, but the format is consistent.
+Each entity directory must contain a Markdown file with YAML frontmatter. The filename must be in **ALL CAPS** (e.g., `SKILL.md`, `PERSONA.md`). Lowercase or mixed-case filenames (e.g., `skill.md`) are not accepted.
 
 ### Frontmatter
 
@@ -52,6 +51,7 @@ The body of the markdown file contains the content/instructions for the entity.
 
 1.  **Structure**: Entities must be contained in their own directory matching their `name`.
 2.  **Existence**: A valid definition markdown file must exist in the entity directory.
-3.  **Frontmatter**: Must be valid YAML and contain required fields (`name`, `description`).
-4.  **Consistency**: The `name` field must match the parent directory name.
-5.  **Strict Mode**: Any parsing error or validation failure in the scanned directories causes the process to fail.
+3.  **Naming**: The definition file must use ALL CAPS filename.
+4.  **Frontmatter**: Must be valid YAML and contain required fields (`name`, `description`).
+5.  **Consistency**: The `name` field must match the parent directory name.
+6.  **Strict Mode**: Any parsing error or validation failure in the scanned directories causes the process to fail.

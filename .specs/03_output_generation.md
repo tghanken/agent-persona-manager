@@ -27,7 +27,9 @@ The `AGENTS.md` file provides a comprehensive summary of all processed entities 
 -   **Root Element**: `<persona-context>`
 -   **Structure**: The XML structure mirrors the directory category/subcategory hierarchy.
 -   **Leaf Elements**: The tag name of the leaf element is the `name` of the entity.
--   **Content**: The leaf element contains all fields found in the YAML frontmatter of the entity.
+-   **Content**:
+    -   Attributes: `path` (relative path to the definition file).
+    -   Child Elements: All fields found in the YAML frontmatter of the entity.
 
 ### Example
 
@@ -41,7 +43,7 @@ Generated `AGENTS.md`:
 <persona-context>
   <skills>
     <coding>
-      <python-helper>
+      <python-helper path="skills/coding/python-helper/SKILL.md">
         <description>Assists with Python coding tasks.</description>
         <license>MIT</license>
         <!-- All other frontmatter fields included here -->
@@ -50,7 +52,7 @@ Generated `AGENTS.md`:
   </skills>
   <personas>
     <creative>
-      <writer>
+      <writer path="personas/creative/writer/PERSONA.md">
         <description>A creative writing assistant.</description>
         <tone>Inspirational</tone>
       </writer>
@@ -61,10 +63,13 @@ Generated `AGENTS.md`:
 
 ## Processing Logic
 
-1.  **Traversal & Validation**: Iterate through all provided input directories (globs). Parse every Markdown file found.
-    -   Validate directory structure (parent directory name matches entity name).
-    -   Validate frontmatter.
-    -   **Strictness**: If *any* file is invalid or malformed, the entire process aborts with an error.
+1.  **Traversal & Validation**: Iterate through all provided input directories (globs). Parse every definition file found.
+    -   **Validation Rules**:
+        -   **Structure**: Parent directory name must match entity name.
+        -   **Frontmatter**: Must be valid YAML with required fields.
+        -   **Nesting**: Entity directories may contain one level of subdirectories (e.g., `scripts/`, `assets/`) which are **not** parsed for further entities. Deeply nested directories are not allowed.
+    -   **Error Handling**: Collect *all* validation errors and failing files. Report all failures to the user.
+    -   **Strictness**: If *any* error is found after processing all files, the entire process aborts.
 2.  **Aggregation**: Group valid entities by their category and subcategory paths relative to the input root.
 3.  **Generation**:
     -   Construct the XML tree based on the aggregation.
