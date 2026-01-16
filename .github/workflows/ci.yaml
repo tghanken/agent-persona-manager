@@ -14,7 +14,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: determinate-systems/nix-installer-action@v16
+      - uses: DeterminateSystems/nix-installer-action@v16
         with:
           extra-conf: |
             substituters = https://cache.nixos.org https://cache.garnix.io
@@ -50,7 +50,7 @@ jobs:
           if [[ "${{ steps.attic-check.outputs.enabled }}" == "true" ]]; then
             ARGS="--attic-cache ${{ secrets.ATTIC_CACHE }}"
           fi
-          nix run github:Mic92/nix-fast-build -- --no-nom --flake .#checks $ARGS
+          nix run nixpkgs#nix-fast-build -- --skip-cached --no-nom --flake .#checks $ARGS
 
       - name: Build packages
         run: |
@@ -58,4 +58,4 @@ jobs:
           if [[ "${{ steps.attic-check.outputs.enabled }}" == "true" ]]; then
             ARGS="--attic-cache ${{ secrets.ATTIC_CACHE }}"
           fi
-          nix run github:Mic92/nix-fast-build -- --no-nom --flake .#packages $ARGS
+          nix run nixpkgs#nix-fast-build -- --skip-cached --no-nom --flake .#packages $ARGS
