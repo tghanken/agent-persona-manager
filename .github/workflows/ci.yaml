@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: determinate-systems/nix-installer-action@v16
+        with:
+          extra-conf: |
+            substituters = https://cache.nixos.org https://cache.garnix.io
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g=
+
+      - name: Check for Attic configuration
+        id: attic-check
+        run: |
+          if [[ -n "${ATTIC_ENDPOINT}" && -n "${ATTIC_TOKEN}" && -n "${ATTIC_CACHE}" ]]; then
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          else
+            echo "enabled=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
+          ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
+          ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
+
+      - name: Setup Attic
+        if: steps.attic-check.outputs.enabled == 'true'
+        run: |
+          nix profile install nixpkgs#attic-client
+          attic login ci "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
+          attic use "$ATTIC_CACHE"
+        env:
+          ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
+          ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
+          ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
+
+      - name: Build checks
+        run: |
+          ARGS=""
+          if [[ "${{ steps.attic-check.outputs.enabled }}" == "true" ]]; then
+            ARGS="--attic-cache ${{ secrets.ATTIC_CACHE }}"
+          fi
+          nix run github:Mic92/nix-fast-build -- --no-nom --flake .#checks $ARGS
+
+      - name: Build packages
+        run: |
+          ARGS=""
+          if [[ "${{ steps.attic-check.outputs.enabled }}" == "true" ]]; then
+            ARGS="--attic-cache ${{ secrets.ATTIC_CACHE }}"
+          fi
+          nix run github:Mic92/nix-fast-build -- --no-nom --flake .#packages $ARGS
