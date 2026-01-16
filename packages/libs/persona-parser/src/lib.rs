@@ -44,6 +44,18 @@ pub struct ParsedEntity {
     pub body: String,
 }
 
+// New types for parsing stages
+pub struct ValidatedPath(PathBuf);
+pub struct FileContent {
+    path: ValidatedPath,
+    content: String,
+}
+pub struct SplitContent {
+    path: ValidatedPath,
+    frontmatter_str: String,
+    body: String,
+}
+
 pub trait PersonaParser {
     fn parse(&self, path: &Path) -> Result<ParsedEntity, PersonaError>;
 }
@@ -53,50 +65,105 @@ pub struct MarkdownParser;
 impl PersonaParser for MarkdownParser {
     #[tracing::instrument(skip(self))]
     fn parse(&self, path: &Path) -> Result<ParsedEntity, PersonaError> {
-        validate_filename(path)?;
+        // Step 1: Validate Path
+        let validated_path = ValidatedPath::new(path)?;
 
-        // 2. Read file
-        // We read the whole file because YAML frontmatter parsing and subsequent body extraction
-        // are most robustly handled when we have the full context, especially for finding the delimiter.
-        // Stream processing is possible but adds significant complexity for delimiter search.
-        let content = std::fs::read_to_string(path)?;
+        // Step 2: Read Content
+        let file_content = FileContent::read(validated_path)?;
 
-        let (frontmatter_str, body) = extract_frontmatter_and_body(&content)?;
+        // Step 3: Split Frontmatter
+        let split_content = SplitContent::parse(file_content)?;
 
-        // 4. Parse Frontmatter
-        let frontmatter: Frontmatter = serde_yaml::from_str(frontmatter_str)?;
+        // Step 4: Parse & Validate Entity
+        ParsedEntity::try_from(split_content)
+    }
+}
 
-        validate_frontmatter(&frontmatter, path)?;
-        validate_body(body)?;
+// Implementations for parsing stages
 
-        Ok(ParsedEntity {
-            path: path.to_path_buf(),
-            frontmatter,
+impl ValidatedPath {
+    pub fn new(path: &Path) -> Result<Self, PersonaError> {
+        let file_stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| PersonaError::InvalidFilename("".to_string()))?;
+
+        if file_stem.chars().any(|c| c.is_lowercase()) {
+            return Err(PersonaError::InvalidFilename(
+                path.file_name().unwrap().to_string_lossy().to_string(),
+            ));
+        }
+        Ok(Self(path.to_path_buf()))
+    }
+}
+
+impl FileContent {
+    pub fn read(path: ValidatedPath) -> Result<Self, PersonaError> {
+        let content = std::fs::read_to_string(&path.0)?;
+        Ok(Self { path, content })
+    }
+}
+
+impl SplitContent {
+    pub fn parse(input: FileContent) -> Result<Self, PersonaError> {
+        let (frontmatter, body) = extract_frontmatter_and_body(&input.content)?;
+        Ok(Self {
+            path: input.path,
+            frontmatter_str: frontmatter.to_string(),
             body: body.to_string(),
         })
     }
 }
 
-// Re-export a convenience function for backward compatibility or ease of use
-pub fn parse_file(path: &Path) -> Result<ParsedEntity, PersonaError> {
-    MarkdownParser.parse(path)
-}
+impl TryFrom<SplitContent> for ParsedEntity {
+    type Error = PersonaError;
 
-fn validate_filename(path: &Path) -> Result<(), PersonaError> {
-    let file_stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .ok_or_else(|| PersonaError::InvalidFilename("".to_string()))?;
+    fn try_from(split: SplitContent) -> Result<Self, Self::Error> {
+        let frontmatter: Frontmatter = serde_yaml::from_str(&split.frontmatter_str)?;
 
-    if file_stem.chars().any(|c| c.is_lowercase()) {
-        return Err(PersonaError::InvalidFilename(
-            path.file_name().unwrap().to_string_lossy().to_string(),
-        ));
+        // Validate logic
+        if !is_valid_name(&frontmatter.name) {
+            return Err(PersonaError::InvalidNameFormat(frontmatter.name));
+        }
+
+        if frontmatter.description.trim().is_empty() {
+            return Err(PersonaError::EmptyDescription);
+        }
+
+        let parent_dir_name = split
+            .path
+            .0
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| {
+                PersonaError::ParentDirNotFound(split.path.0.to_string_lossy().to_string())
+            })?;
+
+        if frontmatter.name != parent_dir_name {
+            return Err(PersonaError::NameMismatch {
+                frontmatter_name: frontmatter.name,
+                dir_name: parent_dir_name.to_string(),
+            });
+        }
+
+        if split.body.trim().is_empty() {
+            return Err(PersonaError::EmptyBody);
+        }
+
+        Ok(ParsedEntity {
+            path: split.path.0,
+            frontmatter,
+            body: split.body,
+        })
     }
-    Ok(())
 }
 
-fn extract_frontmatter_and_body(content: &str) -> Result<(&str, &str), PersonaError> {
+// Helper functions (exposed for internal testing if needed, or kept private)
+// Since we want to unit test them, we can make them crate-public or public.
+// The comment says "Modularize the individual checks as unit testable functions" and "Don't export [parse_file]".
+
+pub fn extract_frontmatter_and_body(content: &str) -> Result<(&str, &str), PersonaError> {
     let trimmed_content = content.trim_start();
     if !trimmed_content.starts_with("---") {
         return Err(PersonaError::MissingFrontmatter);
@@ -135,38 +202,7 @@ fn extract_frontmatter_and_body(content: &str) -> Result<(&str, &str), PersonaEr
     ))
 }
 
-fn validate_frontmatter(frontmatter: &Frontmatter, path: &Path) -> Result<(), PersonaError> {
-    if !is_valid_name(&frontmatter.name) {
-        return Err(PersonaError::InvalidNameFormat(frontmatter.name.clone()));
-    }
-
-    if frontmatter.description.trim().is_empty() {
-        return Err(PersonaError::EmptyDescription);
-    }
-
-    let parent_dir_name = path
-        .parent()
-        .and_then(|p| p.file_name())
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| PersonaError::ParentDirNotFound(path.to_string_lossy().to_string()))?;
-
-    if frontmatter.name != parent_dir_name {
-        return Err(PersonaError::NameMismatch {
-            frontmatter_name: frontmatter.name.clone(),
-            dir_name: parent_dir_name.to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn validate_body(body: &str) -> Result<(), PersonaError> {
-    if body.trim().is_empty() {
-        return Err(PersonaError::EmptyBody);
-    }
-    Ok(())
-}
-
-fn is_valid_name(name: &str) -> bool {
+pub fn is_valid_name(name: &str) -> bool {
     if name.is_empty() || name.len() > 64 {
         return false;
     }

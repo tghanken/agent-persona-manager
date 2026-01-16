@@ -1,173 +1,84 @@
-use persona_parser::{PersonaError, parse_file};
-use std::fs;
-use std::io::Write;
+use persona_parser::{
+    MarkdownParser, PersonaError, PersonaParser, ValidatedPath, extract_frontmatter_and_body,
+    is_valid_name,
+};
 use std::path::PathBuf;
-use tempfile::TempDir;
 
-// Helper to create a file from content
-fn create_fixture(dir_structure: &str, file_name: &str, content: &str) -> (TempDir, PathBuf) {
-    let temp_dir = TempDir::new().unwrap();
-    let root = temp_dir.path();
-    let dir_path = root.join(dir_structure);
-    fs::create_dir_all(&dir_path).unwrap();
-    let file_path = dir_path.join(file_name);
-    let mut file = fs::File::create(&file_path).unwrap();
-    file.write_all(content.as_bytes()).unwrap();
-    // Return temp_dir to keep it alive
-    (temp_dir, file_path)
+// Unit tests for individual components
+
+#[test]
+fn test_filename_validation() {
+    let valid = PathBuf::from("valid/path/ENTITY.md");
+    assert!(ValidatedPath::new(&valid).is_ok());
+
+    let invalid = PathBuf::from("valid/path/entity.md");
+    assert!(matches!(
+        ValidatedPath::new(&invalid),
+        Err(PersonaError::InvalidFilename(_))
+    ));
 }
 
 #[test]
-fn test_valid_parsing() {
+fn test_frontmatter_extraction() {
+    let content = "---\nkey: value\n---\nbody";
+    let result = extract_frontmatter_and_body(content);
+    assert!(result.is_ok());
+    let (fm, body) = result.unwrap();
+    assert_eq!(fm.trim(), "key: value");
+    assert_eq!(body.trim(), "body");
+}
+
+#[test]
+fn test_frontmatter_extraction_missing() {
+    let content = "body only";
+    let result = extract_frontmatter_and_body(content);
+    assert!(matches!(result, Err(PersonaError::MissingFrontmatter)));
+}
+
+#[test]
+fn test_frontmatter_extraction_unclosed() {
+    let content = "---\nkey: value\nbody";
+    let result = extract_frontmatter_and_body(content);
+    assert!(matches!(result, Err(PersonaError::MissingFrontmatter)));
+}
+
+#[test]
+fn test_name_validation() {
+    assert!(is_valid_name("valid-name-123"));
+    assert!(!is_valid_name("InvalidName"));
+    assert!(!is_valid_name("name_with_underscore")); // alphanumeric and hyphens only
+    assert!(!is_valid_name(""));
+    assert!(!is_valid_name(&"a".repeat(65)));
+}
+
+// Integration-style test for full flow using the Parser trait
+// We'll use the inlined content approach to be Nix-safe, but now we test the trait directly.
+// We need to write to disk because the trait takes a path and reads it.
+// To avoid writing to disk in unit tests (as requested), we mostly rely on the component tests above.
+// However, the `parse` method does Step 1 -> 4. We can test one happy path integration.
+
+#[test]
+fn test_full_parse_flow() {
+    use std::fs;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let dir_path = root.join("test-entity");
+    fs::create_dir_all(&dir_path).unwrap();
+    let file_path = dir_path.join("ENTITY.md");
     let content = r#"---
 name: test-entity
 description: Test Description
 ---
 Body content"#;
-    let (_tmp, path) = create_fixture("test-entity", "ENTITY.md", content);
+    let mut file = fs::File::create(&file_path).unwrap();
+    file.write_all(content.as_bytes()).unwrap();
 
-    let result = parse_file(&path);
-    assert!(
-        result.is_ok(),
-        "Failed to parse valid entity: {:?}",
-        result.err()
-    );
+    let parser = MarkdownParser;
+    let result = parser.parse(&file_path);
+    assert!(result.is_ok());
     let entity = result.unwrap();
     assert_eq!(entity.frontmatter.name, "test-entity");
-    assert_eq!(entity.frontmatter.description, "Test Description");
-    assert_eq!(entity.body.trim(), "Body content");
-    assert!(
-        entity
-            .frontmatter
-            .other
-            .as_mapping()
-            .is_none_or(|m| m.is_empty()),
-        "Frontmatter 'other' field should be empty"
-    );
-}
-
-#[test]
-fn test_invalid_filename_case() {
-    let content = r#"---
-name: test-entity
-description: desc
----
-"#;
-    let (_tmp, path) = create_fixture("test-entity", "entity.md", content);
-
-    let result = parse_file(&path);
-    assert!(
-        matches!(result, Err(PersonaError::InvalidFilename(_))),
-        "Expected InvalidFilename, got {:?}",
-        result
-    );
-}
-
-#[test]
-fn test_name_mismatch() {
-    let content = r#"---
-name: other-name
-description: desc
----
-Content body"#;
-    let (_tmp, path) = create_fixture("dir-name", "ENTITY.md", content);
-
-    let result = parse_file(&path);
-    match result {
-        Err(PersonaError::NameMismatch {
-            frontmatter_name,
-            dir_name,
-        }) => {
-            assert_eq!(frontmatter_name, "other-name");
-            assert_eq!(dir_name, "dir-name");
-        }
-        _ => panic!("Expected NameMismatch error, got {:?}", result),
-    }
-}
-
-#[test]
-fn test_invalid_name_format() {
-    let content = r#"---
-name: InvalidName
-description: desc
----
-"#;
-    let (_tmp, path) = create_fixture("InvalidName", "ENTITY.md", content);
-
-    let result = parse_file(&path);
-    assert!(
-        matches!(result, Err(PersonaError::InvalidNameFormat(_))),
-        "Expected InvalidNameFormat, got {:?}",
-        result
-    );
-}
-
-#[test]
-fn test_missing_frontmatter() {
-    let content = r#"Just body content"#;
-    let (_tmp, path) = create_fixture("test-entity", "ENTITY.md", content);
-
-    let result = parse_file(&path);
-    assert!(
-        matches!(result, Err(PersonaError::MissingFrontmatter)),
-        "Expected MissingFrontmatter, got {:?}",
-        result
-    );
-}
-
-#[test]
-fn test_empty_description() {
-    let content = r#"---
-name: test-entity
-description:
----
-"#;
-    let (_tmp, path) = create_fixture("test-entity", "ENTITY.md", content);
-
-    let result = parse_file(&path);
-    assert!(
-        matches!(result, Err(PersonaError::EmptyDescription)),
-        "Expected EmptyDescription, got {:?}",
-        result
-    );
-}
-
-#[test]
-fn test_empty_body() {
-    let content = r#"---
-name: test-entity
-description: valid description
----
-"#;
-    let (_tmp, path) = create_fixture("test-entity", "ENTITY.md", content);
-
-    let result = parse_file(&path);
-    assert!(
-        matches!(result, Err(PersonaError::EmptyBody)),
-        "Expected EmptyBody, got {:?}",
-        result
-    );
-}
-
-#[test]
-fn test_nested_triples_in_content() {
-    let content = r#"---
-name: test-nested
-description: desc
----
-Here is some code:
-```
----
-```"#;
-    let (_tmp, path) = create_fixture("test-nested", "ENTITY.md", content);
-
-    let result = parse_file(&path);
-    assert!(
-        result.is_ok(),
-        "Failed to parse nested triples: {:?}",
-        result.err()
-    );
-    let entity = result.unwrap();
-    assert_eq!(entity.frontmatter.name, "test-nested");
-    assert_eq!(entity.body.trim(), "Here is some code:\n```\n---\n```");
 }

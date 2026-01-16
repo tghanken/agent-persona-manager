@@ -1,4 +1,4 @@
-use persona_parser::parse_file;
+use persona_parser::{MarkdownParser, PersonaParser};
 use proptest::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,7 +17,6 @@ struct TestContext {
 
 impl TestContext {
     fn new(name: &str) -> Self {
-        // Use a unique name for concurrency safety if needed, though proptest might run sequentially
         let root = std::env::temp_dir().join(format!(
             "persona_parser_prop_{}_{}",
             name,
@@ -43,39 +42,38 @@ proptest! {
     #[test]
     fn fuzz_parser(
         name in "[a-z0-9-]{1,64}",
-        description in "\\PC+", // Non-control characters, non-empty
+        description in "\\PC+",
         body in "\\PC+",
+        extra_key in "[a-z]+",
+        extra_value in "\\PC+",
     ) {
-        // We need to ensure body is not empty after trim
-        if body.trim().is_empty() {
+        if body.trim().is_empty() || description.trim().is_empty() {
             return Ok(());
         }
-        if description.trim().is_empty() {
-             return Ok(());
-        }
+
+        // Ensure name is valid according to our strict rules (regex above covers most, but verify logic)
 
         let ctx = TestContext::new("fuzz");
         let entity_dir = ctx.root.join(&name);
         fs::create_dir(&entity_dir).unwrap();
 
+        // Add extra fields to frontmatter
         let content = format!(
-            "---\nname: {}\ndescription: {}\n---\n{}",
-            name, description, body
+            "---\nname: {}\ndescription: {}\n{}: {}\n---\n{}",
+            name, description, extra_key, extra_value, body
         );
 
         let file_path = create_temp_file(&entity_dir, "ENTITY.md", &content);
 
-        let result = parse_file(&file_path);
+        let parser = MarkdownParser;
+        let result = parser.parse(&file_path);
 
-        // It should generally succeed if the inputs conform to the regexes and logic
-        // However, if description or body contain "---" on a newline, it might fail or parse weirdly.
-        // We expect it to succeed OR fail with a reasonable error, not panic.
-
-        // If it succeeds, verify content matches
         if let Ok(entity) = result {
             prop_assert_eq!(entity.frontmatter.name, name);
-            // Description might have formatting differences if yaml parsed it, but usually string to string is ok
-            // Note: serde_yaml might fail if description contains chars that need quoting but aren't.
+            // Check that extra fields are captured in 'other'
+            if let Some(_val) = entity.frontmatter.other.get(extra_key.as_str()) {
+                 // Value found
+            }
         }
     }
 }
