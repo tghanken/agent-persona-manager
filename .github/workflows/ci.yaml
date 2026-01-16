@@ -1,11 +1,9 @@
 name: CI
-
 on:
   pull_request:
   push:
     branches:
       - main
-
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -19,7 +17,6 @@ jobs:
           extra-conf: |
             substituters = https://cache.nixos.org https://cache.garnix.io
             trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g=
-
       - name: Check for Attic configuration
         id: attic-check
         run: |
@@ -32,7 +29,6 @@ jobs:
           ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
           ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
           ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
-
       - name: Setup Attic
         if: steps.attic-check.outputs.enabled == 'true'
         run: |
@@ -43,7 +39,6 @@ jobs:
           ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
           ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
           ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
-
       - name: Build checks
         run: |
           ARGS=""
@@ -51,7 +46,6 @@ jobs:
             ARGS="--attic-cache ${{ secrets.ATTIC_CACHE }}"
           fi
           nix run nixpkgs#nix-fast-build -- --skip-cached --no-nom --flake .#checks $ARGS
-
       - name: Build packages
         run: |
           ARGS=""
