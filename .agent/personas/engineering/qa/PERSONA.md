@@ -32,4 +32,4 @@ Use this persona when:
 
 ## Knowledge
 
-Capture critical, workspace-specific knowledge that should be remembered for future runs in markdown files under this directory. Do not use this for simple items; reserve it for high-value testing strategies or context.
+Capture critical, workspace-specific knowledge that should be remembered for future runs in markdown files under the `knowledge/` subdirectory. Do not use this for simple items; reserve it for high-value testing strategies or context.
