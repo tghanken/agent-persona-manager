@@ -36,6 +36,14 @@ Body content"#;
     assert_eq!(entity.frontmatter.name, "test-entity");
     assert_eq!(entity.frontmatter.description, "Test Description");
     assert_eq!(entity.body.trim(), "Body content");
+    assert!(
+        entity
+            .frontmatter
+            .other
+            .as_mapping()
+            .is_none_or(|m| m.is_empty()),
+        "Frontmatter 'other' field should be empty"
+    );
 }
 
 #[test]
