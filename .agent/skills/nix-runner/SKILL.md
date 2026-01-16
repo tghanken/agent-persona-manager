@@ -1,7 +1,7 @@
 ---
 name: nix-runner
 description: Execute Nix commands to build, develop, and run checks in the environment. Use this to manage dependencies and verify the codebase.
-license: MIT
+compatibility: Requires nix
 ---
 
 # Nix Runner
@@ -27,6 +27,10 @@ Run flake checks:
 ```bash
 nix flake check
 ```
+To run all checks without stopping on the first failure:
+```bash
+nix flake check --keep-going
+```
 
 ## Usage
 
@@ -34,3 +38,4 @@ Use this skill when you need to:
 - Verify that the Nix configuration is correct.
 - Build artifacts defined in the flake.
 - Run tests or checks defined in the flake.
+- Run `nix flake check` before finalizing a PR to ensure all checks pass.
