@@ -1,7 +1,7 @@
 [dependencies]
 thiserror = { workspace = true }
 tracing = { workspace = true }
-walkdir = "2"
+walkdir = { workspace = true }
 
 [package]
 name = "persona-core"

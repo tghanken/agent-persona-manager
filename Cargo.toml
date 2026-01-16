@@ -11,6 +11,7 @@ persona-core = { path = "packages/libs/persona-core" }
 persona-parser = { path = "packages/libs/persona-parser" }
 thiserror = "2"
 tracing = "^0.1.44"
+walkdir = "2"
 
 [workspace.package]
 rust-version = "1.85.0"

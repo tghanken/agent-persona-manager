@@ -23,6 +23,8 @@ pub enum PersonaError {
     InvalidNameFormat(String),
     #[error("Missing or empty description")]
     EmptyDescription,
+    #[error("Missing or empty body content")]
+    EmptyBody,
     #[error("Parent directory not found for path: {0}")]
     ParentDirNotFound(String),
 }
@@ -124,7 +126,12 @@ pub fn parse_file(path: &Path) -> Result<ParsedEntity, PersonaError> {
         return Err(PersonaError::EmptyDescription);
     }
 
-    // 7. Validate Name matches Parent Directory
+    // 7. Validate Body Content
+    if body_part.trim().is_empty() {
+        return Err(PersonaError::EmptyBody);
+    }
+
+    // 8. Validate Name matches Parent Directory
     let parent_dir_name = path
         .parent()
         .and_then(|p| p.file_name())
