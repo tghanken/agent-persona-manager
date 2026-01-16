@@ -29,3 +29,7 @@ Use this persona when:
 - Reviewing pull requests or code snippets.
 - discussing coding standards or best practices.
 - Debugging complex issues.
+
+## Knowledge
+
+Capture critical, workspace-specific knowledge that should be remembered for future runs in markdown files under this directory. Do not use this for simple items; reserve it for high-value implementation details or context.
