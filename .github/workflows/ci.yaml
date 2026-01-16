@@ -29,6 +29,13 @@ jobs:
           ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
           ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
           ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
+      - name: Connect to Tailscale
+        if: steps.attic-check.outputs.enabled == 'true'
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+          tags: tag:ci
       - name: Setup Attic
         if: steps.attic-check.outputs.enabled == 'true'
         run: |
