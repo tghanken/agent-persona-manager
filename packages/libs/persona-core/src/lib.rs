@@ -73,7 +73,11 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<EntityOrHeader
                                     }));
                                 }
                                 Err(e) => {
-                                    let msg = format!("Failed to read HEADER.md at {}: {}", path.display(), e);
+                                    let msg = format!(
+                                        "Failed to read HEADER.md at {}: {}",
+                                        path.display(),
+                                        e
+                                    );
                                     tracing::error!("{}", msg);
                                     errors.push(msg);
                                 }
@@ -184,12 +188,13 @@ pub fn print_hierarchy(
                 match item {
                     EntityOrHeader::Entity(e) => root.insert_name(e.frontmatter.name.clone()),
                     EntityOrHeader::Header(h) => {
-                         let parent_name = h.path
-                             .parent()
-                             .and_then(|p| p.file_name())
-                             .and_then(|s| s.to_str())
-                             .unwrap_or("unknown")
-                             .to_string();
+                        let parent_name = h
+                            .path
+                            .parent()
+                            .and_then(|p| p.file_name())
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("unknown")
+                            .to_string();
                         root.insert_name(parent_name);
                     }
                 }

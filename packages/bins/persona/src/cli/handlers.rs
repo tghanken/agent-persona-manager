@@ -60,8 +60,8 @@ fn handle_build_command(
     if let Some(out_dir) = output {
         fs::create_dir_all(out_dir)?;
 
-        for entity in entities {
-            let path = &entity.path;
+        for item in entities {
+            let path = item.path();
             // Determine relative path
             let mut relative_path = None;
             for input in inputs {

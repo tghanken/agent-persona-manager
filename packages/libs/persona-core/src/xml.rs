@@ -6,10 +6,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 
-pub fn generate_xml(
-    items: &[EntityOrHeader],
-    inputs: &[PathBuf],
-) -> Result<String, PersonaError> {
+pub fn generate_xml(items: &[EntityOrHeader], inputs: &[PathBuf]) -> Result<String, PersonaError> {
     let mut root = NodeRef::new();
     for item in items {
         let path = item.path();
@@ -107,10 +104,10 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
             // Attribute: path
             elem.push_attribute(("path", entity.path.to_string_lossy().as_ref()));
         } else if let Some(header) = child_node.header {
-             // Attribute: path from header if no entity present?
-             // Or typically categories with headers don't have an entity file for themselves.
-             // We can put the header path.
-             elem.push_attribute(("path", header.path.to_string_lossy().as_ref()));
+            // Attribute: path from header if no entity present?
+            // Or typically categories with headers don't have an entity file for themselves.
+            // We can put the header path.
+            elem.push_attribute(("path", header.path.to_string_lossy().as_ref()));
         }
 
         writer.write_event(Event::Start(elem))?;
@@ -118,7 +115,7 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
         if let Some(header) = child_node.header {
             let desc_elem = BytesStart::new("directions");
             writer.write_event(Event::Start(desc_elem.clone()))?;
-            writer.write_event(Event::Text(BytesText::from_escaped(header.body.trim())))?;
+            writer.write_event(Event::Text(BytesText::new(header.body.trim())))?;
             writer.write_event(Event::End(BytesEnd::new("directions")))?;
         }
 
