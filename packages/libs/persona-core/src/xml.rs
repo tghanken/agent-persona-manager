@@ -1,15 +1,12 @@
 use crate::PersonaError;
 use persona_parser::ParsedEntity;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 
-pub fn generate_xml(
-    entities: &[ParsedEntity],
-    inputs: &[PathBuf],
-) -> Result<String, PersonaError> {
+pub fn generate_xml(entities: &[ParsedEntity], inputs: &[PathBuf]) -> Result<String, PersonaError> {
     let mut root = NodeRef::new();
     for entity in entities {
         let path = &entity.path;
@@ -97,7 +94,9 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
             // Description
             let desc_elem = BytesStart::new("description");
             writer.write_event(Event::Start(desc_elem.clone()))?;
-            writer.write_event(Event::Text(BytesText::new(&entity.frontmatter.description)))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(
+                &entity.frontmatter.description,
+            )))?;
             writer.write_event(Event::End(BytesEnd::new("description")))?;
 
             // Other frontmatter fields
@@ -134,13 +133,13 @@ fn write_yaml_value<W: Write>(
             }
         }
         serde_yaml::Value::String(s) => {
-            writer.write_event(Event::Text(BytesText::new(s)))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(s)))?;
         }
         serde_yaml::Value::Number(n) => {
-            writer.write_event(Event::Text(BytesText::new(&n.to_string())))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(n.to_string())))?;
         }
         serde_yaml::Value::Bool(b) => {
-            writer.write_event(Event::Text(BytesText::new(&b.to_string())))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(b.to_string())))?;
         }
         serde_yaml::Value::Sequence(seq) => {
             for item in seq {
@@ -250,8 +249,8 @@ mod tests {
 
         let xml = generate_xml(&[entity], &inputs).unwrap();
 
-        // Should be escaped
-        assert!(xml.contains("&lt;&amp;&gt;&quot;&apos;"));
-        assert!(xml.contains("Test &amp; check &lt; &gt;"));
+        // Should NOT escape
+        assert!(xml.contains("<&>\"'"));
+        assert!(xml.contains("Test & check < >"));
     }
 }

@@ -72,12 +72,9 @@ fn handle_build_command(
             }
 
             if let Some(rel) = relative_path {
-                // rel is category/subcategory/entity/ENTITY.md
-                // we want dest to be out_dir/category/subcategory/entity
                 let parent_rel = rel.parent().unwrap_or_else(|| Path::new("."));
                 let dest_dir = out_dir.join(parent_rel);
 
-                // Source directory is the parent of ENTITY.md
                 let src_dir = path
                     .parent()
                     .ok_or_else(|| anyhow::anyhow!("Entity has no parent dir"))?;
