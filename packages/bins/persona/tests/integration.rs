@@ -36,7 +36,8 @@ Use rust for systems programming.
     // Note: generate_xml uses entity.path for the path attribute.
     // Since we pass absolute path as input, entity.path is absolute.
     // Ideally we should use relative paths, but for this test we match what generate_xml produces.
-    let expected_xml = format!(r#"<persona-context>
+    let expected_xml = format!(
+        r#"<persona-context>
   <skills>
     <coding>
       <rust path="{}">
@@ -44,7 +45,9 @@ Use rust for systems programming.
       </rust>
     </coding>
   </skills>
-</persona-context>"#, skill_file.to_string_lossy());
+</persona-context>"#,
+        skill_file.to_string_lossy()
+    );
     fs::write(&agents_file, &expected_xml).unwrap();
 
     // Mock CLI arguments
