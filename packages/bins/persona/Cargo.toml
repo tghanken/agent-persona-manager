@@ -1,3 +1,7 @@
+[[bench]]
+name = "commands"
+harness = false
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { version = "4.5.4", features = ["derive"] }
@@ -5,16 +9,12 @@ persona-core = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = "0.3"
 
+[dev-dependencies]
+criterion = "0.5"
+tempfile = { workspace = true }
+
 [package]
 name = "persona"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
-
-[dev-dependencies]
-criterion = "0.5"
-tempfile = "3"
-
-[[bench]]
-name = "commands"
-harness = false

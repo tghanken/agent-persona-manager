@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use persona_core::{collect_entities, print_hierarchy, xml::generate_xml};
 use std::fs;
 use tempfile::TempDir;
