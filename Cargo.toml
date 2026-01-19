@@ -7,6 +7,7 @@ resolver = "2"
 members = ["packages/bins/*", "packages/libs/*"]
 
 [workspace.dependencies]
+anyhow = "1"
 persona-core = { path = "packages/libs/persona-core" }
 persona-parser = { path = "packages/libs/persona-parser" }
 thiserror = "2"

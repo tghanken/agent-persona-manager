@@ -296,6 +296,8 @@ dependencies = [
 name = "persona-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "persona-parser",
  "thiserror",
  "tracing",
  "walkdir",

@@ -1,4 +1,6 @@
 [dependencies]
+anyhow = { workspace = true }
+persona-parser = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 walkdir = { workspace = true }

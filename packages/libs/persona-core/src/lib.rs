@@ -3,9 +3,58 @@ pub fn hello() {
     println!("Hello, world!");
 }
 
+use persona_parser::{MarkdownParser, PersonaParser as _};
+use std::path::PathBuf;
+use walkdir::WalkDir;
+
 #[tracing::instrument]
-pub fn validate() {
-    println!("Validating...");
+pub fn validate_inputs(inputs: &[PathBuf]) -> anyhow::Result<()> {
+    let mut errors = Vec::new();
+    let parser = MarkdownParser;
+
+    for dir in inputs {
+        if !dir.exists() {
+            let msg = format!("Directory '{}' does not exist.", dir.display());
+            tracing::error!("{}", msg);
+            errors.push(msg);
+            continue;
+        }
+
+        for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    if extension == "md" {
+                        let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+
+                        // Check if file stem is non-empty and has NO lowercase chars
+                        let is_all_caps =
+                            !file_stem.is_empty() && !file_stem.chars().any(|c| c.is_lowercase());
+
+                        if is_all_caps {
+                            if let Err(e) = parser.parse(path) {
+                                let msg = format!("{}: {}", path.display(), e);
+                                tracing::error!("Validation error: {}", msg);
+                                errors.push(msg);
+                            } else {
+                                tracing::debug!("Successfully validated {}", path.display());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        eprintln!("Validation failed with {} errors:", errors.len());
+        for err in &errors {
+            eprintln!("- {}", err);
+        }
+        return Err(anyhow::anyhow!("Validation failed"));
+    }
+
+    Ok(())
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -57,8 +106,9 @@ mod tests {
     }
 
     #[test]
-    fn test_validate() {
-        validate();
+    fn test_validate_inputs() {
+        // Test with empty inputs, should pass
+        assert!(validate_inputs(&[]).is_ok());
     }
 
     #[test]
