@@ -1,3 +1,4 @@
+pub mod xml;
 #[tracing::instrument]
 pub fn hello() {
     println!("Hello, world!");
@@ -59,6 +60,24 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>>
 
     Ok(entities)
 }
+
+ #[tracing::instrument]
+ pub fn validate() {
+     println!("Validating...");
+ }
+ 
+ #[derive(thiserror::Error, Debug)]
+ pub enum PersonaError {
+     #[error("Directory '{0}' does not exist")]
+     DirectoryNotFound(String),
+     #[error("IO error: {0}")]
+     Io(#[from] std::io::Error),
+    #[error("XML generation error: {0}")]
+   Xml(#[from] quick_xml::Error),
+   #[error("Serialization error: {0}")]
+   Serialization(String),
+ }
+
 
 #[tracing::instrument(skip(writer))]
 pub fn print_hierarchy(
