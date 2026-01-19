@@ -219,6 +219,12 @@ mod tests {
 
     #[test]
     fn test_collect_entities() {
+        // Test with empty inputs, should pass
+        assert!(collect_entities(&[]).is_ok());
+    }
+ 
+     #[test]
+     fn test_list_files() {
         // Create a temporary directory structure
         let temp_dir = std::env::temp_dir().join("persona_test_collect_entities");
         if temp_dir.exists() {

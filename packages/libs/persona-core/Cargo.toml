@@ -2,8 +2,8 @@
 anyhow = { workspace = true }
 persona-parser = { workspace = true }
 quick-xml = { version = "0.31", features = ["serialize"] }
-serde = { workspace = true }                               # unified
-serde_yaml = { workspace = true }                          # unified
+serde = { version = "^1.0.228", features = ["derive"] }    # unified
+serde_yaml = "^0.9.34"                                     # unified
 thiserror = { workspace = true }
 tracing = { workspace = true }
 walkdir = { workspace = true }
