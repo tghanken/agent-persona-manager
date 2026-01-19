@@ -44,23 +44,34 @@ proptest! {
         name in "[a-z0-9-]{1,64}",
         description in "\\PC+",
         body in "\\PC+",
-        extra_key in "[a-z]+",
-        extra_value in "\\PC+",
+        extra_fields in proptest::collection::hash_map("[a-z]+", "\\PC+", 0..10),
     ) {
         if body.trim().is_empty() || description.trim().is_empty() {
             return Ok(());
         }
 
-        // Ensure name is valid according to our strict rules (regex above covers most, but verify logic)
-
         let ctx = TestContext::new("fuzz");
         let entity_dir = ctx.root.join(&name);
         fs::create_dir(&entity_dir).unwrap();
 
-        // Add extra fields to frontmatter
+        // Construct valid YAML using serde to avoid syntax errors from random content
+        let mut frontmatter = serde_yaml::Mapping::new();
+        frontmatter.insert(serde_yaml::Value::String("name".to_string()), serde_yaml::Value::String(name.clone()));
+        frontmatter.insert(serde_yaml::Value::String("description".to_string()), serde_yaml::Value::String(description.clone()));
+
+        for (k, v) in &extra_fields {
+            frontmatter.insert(serde_yaml::Value::String(k.clone()), serde_yaml::Value::String(v.clone()));
+        }
+
+        let frontmatter_str = serde_yaml::to_string(&frontmatter).unwrap();
+        // serde_yaml includes the "---" separator usually? No, just the content.
+        // Wait, to_string might produce "---" at start if it thinks it's a document.
+        // Let's trim it and wrap it ourselves to be sure we match our parser expectation
+        let frontmatter_clean = frontmatter_str.trim_start_matches("---\n").trim();
+
         let content = format!(
-            "---\nname: {}\ndescription: {}\n{}: {}\n---\n{}",
-            name, description, extra_key, extra_value, body
+            "---\n{}\n---\n{}",
+            frontmatter_clean, body
         );
 
         let file_path = create_temp_file(&entity_dir, "ENTITY.md", &content);
@@ -70,9 +81,8 @@ proptest! {
 
         if let Ok(entity) = result {
             prop_assert_eq!(entity.frontmatter.name, name);
-            // Check that extra fields are captured in 'other'
-            if let Some(_val) = entity.frontmatter.other.get(extra_key.as_str()) {
-                 // Value found
+            for (k, _v) in extra_fields {
+                prop_assert!(entity.frontmatter.other.get(&k).is_some(), "Field {} missing from other", k);
             }
         }
     }

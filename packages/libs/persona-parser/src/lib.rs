@@ -82,7 +82,7 @@ impl PersonaParser for MarkdownParser {
 // Implementations for parsing stages
 
 impl ValidatedPath {
-    pub fn new(path: &Path) -> Result<Self, PersonaError> {
+    fn new(path: &Path) -> Result<Self, PersonaError> {
         let file_stem = path
             .file_stem()
             .and_then(|s| s.to_str())
@@ -98,14 +98,14 @@ impl ValidatedPath {
 }
 
 impl FileContent {
-    pub fn read(path: ValidatedPath) -> Result<Self, PersonaError> {
+    fn read(path: ValidatedPath) -> Result<Self, PersonaError> {
         let content = std::fs::read_to_string(&path.0)?;
         Ok(Self { path, content })
     }
 }
 
 impl SplitContent {
-    pub fn parse(input: FileContent) -> Result<Self, PersonaError> {
+    fn parse(input: FileContent) -> Result<Self, PersonaError> {
         let (frontmatter, body) = extract_frontmatter_and_body(&input.content)?;
         Ok(Self {
             path: input.path,
@@ -159,11 +159,7 @@ impl TryFrom<SplitContent> for ParsedEntity {
     }
 }
 
-// Helper functions (exposed for internal testing if needed, or kept private)
-// Since we want to unit test them, we can make them crate-public or public.
-// The comment says "Modularize the individual checks as unit testable functions" and "Don't export [parse_file]".
-
-pub fn extract_frontmatter_and_body(content: &str) -> Result<(&str, &str), PersonaError> {
+fn extract_frontmatter_and_body(content: &str) -> Result<(&str, &str), PersonaError> {
     let trimmed_content = content.trim_start();
     if !trimmed_content.starts_with("---") {
         return Err(PersonaError::MissingFrontmatter);
@@ -202,10 +198,60 @@ pub fn extract_frontmatter_and_body(content: &str) -> Result<(&str, &str), Perso
     ))
 }
 
-pub fn is_valid_name(name: &str) -> bool {
+fn is_valid_name(name: &str) -> bool {
     if name.is_empty() || name.len() > 64 {
         return false;
     }
     name.chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filename_validation() {
+        let valid = PathBuf::from("valid/path/ENTITY.md");
+        assert!(ValidatedPath::new(&valid).is_ok());
+
+        let invalid = PathBuf::from("valid/path/entity.md");
+        assert!(matches!(
+            ValidatedPath::new(&invalid),
+            Err(PersonaError::InvalidFilename(_))
+        ));
+    }
+
+    #[test]
+    fn test_frontmatter_extraction() {
+        let content = "---\nkey: value\n---\nbody";
+        let result = extract_frontmatter_and_body(content);
+        assert!(result.is_ok());
+        let (fm, body) = result.unwrap();
+        assert_eq!(fm.trim(), "key: value");
+        assert_eq!(body.trim(), "body");
+    }
+
+    #[test]
+    fn test_frontmatter_extraction_missing() {
+        let content = "body only";
+        let result = extract_frontmatter_and_body(content);
+        assert!(matches!(result, Err(PersonaError::MissingFrontmatter)));
+    }
+
+    #[test]
+    fn test_frontmatter_extraction_unclosed() {
+        let content = "---\nkey: value\nbody";
+        let result = extract_frontmatter_and_body(content);
+        assert!(matches!(result, Err(PersonaError::MissingFrontmatter)));
+    }
+
+    #[test]
+    fn test_name_validation() {
+        assert!(is_valid_name("valid-name-123"));
+        assert!(!is_valid_name("InvalidName"));
+        assert!(!is_valid_name("name_with_underscore"));
+        assert!(!is_valid_name(""));
+        assert!(!is_valid_name(&"a".repeat(65)));
+    }
 }
