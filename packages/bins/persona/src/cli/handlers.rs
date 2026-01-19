@@ -20,8 +20,8 @@ pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
         .try_init();
 
     match cli.command {
-        Commands::Check => {
-            handle_check_command(&cli.input)?;
+        Commands::Check { agents_file } => {
+            handle_check_command(&cli.input, &agents_file)?;
         }
         Commands::List => {
             handle_list_command(&cli.input)?;
@@ -41,8 +41,28 @@ fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
 }
 
 #[tracing::instrument]
-fn handle_check_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
-    collect_entities(inputs)?;
+fn handle_check_command(inputs: &[PathBuf], agents_file: &Path) -> anyhow::Result<()> {
+    let entities = collect_entities(inputs)?;
+
+    let expected_xml = generate_xml(&entities, inputs)?;
+
+    if !agents_file.exists() {
+        anyhow::bail!(
+            "{} is missing. Run 'persona build' to generate it.",
+            agents_file.display()
+        );
+    }
+
+    let current_content = fs::read_to_string(agents_file)?;
+    if current_content != expected_xml {
+        tracing::debug!("Expected XML:\n{}", expected_xml);
+        tracing::debug!("Current Content:\n{}", current_content);
+        anyhow::bail!(
+            "{} is out of date. Run 'persona build' to update it.",
+            agents_file.display()
+        );
+    }
+
     Ok(())
 }
 
