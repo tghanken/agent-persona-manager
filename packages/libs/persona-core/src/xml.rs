@@ -4,23 +4,35 @@ use quick_xml::Writer;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use std::collections::BTreeMap;
 use std::io::Write;
+use std::path::PathBuf;
 
-pub fn generate_xml(entities: &[ParsedEntity]) -> Result<String, PersonaError> {
+pub fn generate_xml(entities: &[ParsedEntity], inputs: &[PathBuf]) -> Result<String, PersonaError> {
     let mut root = NodeRef::new();
     for entity in entities {
         let path = &entity.path;
-        let parent = path.parent().ok_or_else(|| {
+
+        let mut relative_path = None;
+        for input in inputs {
+            if let Ok(rel) = path.strip_prefix(input) {
+                relative_path = Some(rel);
+                break;
+            }
+        }
+
+        let rel_path = match relative_path {
+            Some(p) => p,
+            None => path.as_path(),
+        };
+
+        let parent = rel_path.parent().ok_or_else(|| {
             PersonaError::Serialization(format!("Entity has no parent directory: {:?}", path))
         })?;
 
-        let mut components: Vec<String> = parent
+        let components: Vec<String> = parent
             .iter()
             .map(|c| c.to_string_lossy().to_string())
+            .filter(|s| s != ".")
             .collect();
-
-        if components.first().map(|s| s == ".").unwrap_or(false) {
-            components.remove(0);
-        }
 
         let mut current_node = &mut root;
         for component in components {
@@ -156,9 +168,7 @@ mod tests {
 
     #[test]
     fn test_generate_xml_example() {
-        // Input structure:
-        // -   `skills/coding/python-helper/SKILL.md` (name: `python-helper`)
-        // -   `personas/creative/writer/PERSONA.md` (name: `writer`)
+        let inputs = vec![PathBuf::from(".")];
 
         let mut entity1_other = Mapping::new();
         entity1_other.insert(
@@ -167,7 +177,7 @@ mod tests {
         );
 
         let entity1 = ParsedEntity {
-            path: PathBuf::from("skills/coding/python-helper/SKILL.md"),
+            path: PathBuf::from("./skills/coding/python-helper/SKILL.md"),
             frontmatter: Frontmatter {
                 name: "python-helper".to_string(),
                 description: "Assists with Python coding tasks.".to_string(),
@@ -183,7 +193,7 @@ mod tests {
         );
 
         let entity2 = ParsedEntity {
-            path: PathBuf::from("personas/creative/writer/PERSONA.md"),
+            path: PathBuf::from("./personas/creative/writer/PERSONA.md"),
             frontmatter: Frontmatter {
                 name: "writer".to_string(),
                 description: "A creative writing assistant.".to_string(),
@@ -194,12 +204,13 @@ mod tests {
 
         let entities = vec![entity1, entity2];
 
-        let xml = generate_xml(&entities).unwrap();
+        let xml = generate_xml(&entities, &inputs).unwrap();
 
+        // BTreeMap sorts keys. personas < skills.
         let expected_xml = r#"<persona-context>
   <personas>
     <creative>
-      <writer path="personas/creative/writer/PERSONA.md">
+      <writer path="./personas/creative/writer/PERSONA.md">
         <description>A creative writing assistant.</description>
         <tone>Inspirational</tone>
       </writer>
@@ -207,19 +218,19 @@ mod tests {
   </personas>
   <skills>
     <coding>
-      <python-helper path="skills/coding/python-helper/SKILL.md">
+      <python-helper path="./skills/coding/python-helper/SKILL.md">
         <description>Assists with Python coding tasks.</description>
         <license>MIT</license>
       </python-helper>
     </coding>
   </skills>
 </persona-context>"#;
-
         assert_eq!(xml, expected_xml);
     }
 
     #[test]
     fn test_generate_xml_escaping() {
+        let inputs = vec![PathBuf::from(".")];
         let mut other = Mapping::new();
         other.insert(
             serde_yaml::Value::String("special".to_string()),
@@ -236,7 +247,7 @@ mod tests {
             body: "".to_string(),
         };
 
-        let xml = generate_xml(&[entity]).unwrap();
+        let xml = generate_xml(&[entity], &inputs).unwrap();
 
         // Should NOT escape
         assert!(xml.contains("<&>\"'"));
