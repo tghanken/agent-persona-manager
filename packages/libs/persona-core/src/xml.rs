@@ -93,13 +93,26 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
         writer.write_event(Event::Start(elem))?;
 
         if let Some(entity) = child_node.entity {
+            let is_header = entity
+                .path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .map(|s| s == "HEADER.md")
+                .unwrap_or(false);
+
+            let tag_name = if is_header {
+                "directions"
+            } else {
+                "description"
+            };
+
             // Description
-            let desc_elem = BytesStart::new("description");
+            let desc_elem = BytesStart::new(tag_name);
             writer.write_event(Event::Start(desc_elem.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(
                 &entity.frontmatter.description,
             )))?;
-            writer.write_event(Event::End(BytesEnd::new("description")))?;
+            writer.write_event(Event::End(BytesEnd::new(tag_name)))?;
 
             // Other frontmatter fields
             write_yaml_value(writer, &entity.frontmatter.other)?;
@@ -285,7 +298,7 @@ mod tests {
         // Expectation:
         // <skills>
         //   <coding path="...">
-        //     <description>Coding Category Description</description>
+        //     <directions>Coding Category Description</directions>
         //     <rust path="...">
         //       <description>Rust Skill</description>
         //     </rust>
@@ -293,7 +306,7 @@ mod tests {
         // </skills>
 
         assert!(xml.contains("<coding path=\"./skills/coding/HEADER.md\">"));
-        assert!(xml.contains("<description>Coding Category Description</description>"));
+        assert!(xml.contains("<directions>Coding Category Description</directions>"));
         assert!(xml.contains("<rust path=\"./skills/coding/rust/SKILL.md\">"));
         assert!(xml.contains("<description>Rust Skill</description>"));
     }

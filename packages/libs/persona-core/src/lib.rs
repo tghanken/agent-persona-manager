@@ -5,7 +5,7 @@ pub fn hello() {
 }
 
 pub use persona_parser::ParsedEntity;
-use persona_parser::{MarkdownParser, PersonaParser as _};
+use persona_parser::{Frontmatter, MarkdownParser, PersonaParser as _};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -42,17 +42,47 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>>
                     if extension == "md" {
                         let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
-                        // Check if file stem is non-empty and has NO lowercase chars
-                        let is_all_caps =
-                            !file_stem.is_empty() && !file_stem.chars().any(|c| c.is_lowercase());
+                        let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                        if file_name == "HEADER.md" {
+                            match std::fs::read_to_string(path) {
+                                Ok(content) => {
+                                    let parent_name = path
+                                        .parent()
+                                        .and_then(|p| p.file_name())
+                                        .and_then(|s| s.to_str())
+                                        .unwrap_or("unknown")
+                                        .to_string();
 
-                        if is_all_caps {
-                            match parser.parse(path) {
-                                Ok(entity) => entities.push(entity),
+                                    let entity = ParsedEntity {
+                                        path: path.to_path_buf(),
+                                        frontmatter: Frontmatter {
+                                            name: parent_name,
+                                            description: content.trim().to_string(),
+                                            other: serde_yaml::Value::Null,
+                                        },
+                                        body: String::new(),
+                                    };
+                                    entities.push(entity);
+                                }
                                 Err(e) => {
-                                    let msg = format!("{}: {}", path.display(), e);
-                                    tracing::error!("Validation error: {}", msg);
+                                    let msg = format!("Failed to read HEADER.md at {}: {}", path.display(), e);
+                                    tracing::error!("{}", msg);
                                     errors.push(msg);
+                                }
+                            }
+                        } else {
+                            // Check if file stem is non-empty and has NO lowercase chars
+                            let is_all_caps = !file_stem.is_empty()
+                                && !file_stem.chars().any(|c| c.is_lowercase());
+
+                            if is_all_caps {
+                                match parser.parse(path) {
+                                    Ok(entity) => entities.push(entity),
+                                    Err(e) => {
+                                        let msg = format!("{}: {}", path.display(), e);
+                                        tracing::error!("Validation error: {}", msg);
+                                        errors.push(msg);
+                                    }
                                 }
                             }
                         }
