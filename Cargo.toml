@@ -12,6 +12,7 @@ persona-core = { path = "packages/libs/persona-core" }
 persona-parser = { path = "packages/libs/persona-parser" }
 serde = { version = "^1.0.228", features = ["derive"] }    # unified
 serde_yaml = "^0.9.34"                                     # unified
+tempfile = "3"
 thiserror = "2"
 tracing = "^0.1.44"
 walkdir = "2"
