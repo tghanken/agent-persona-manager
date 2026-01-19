@@ -10,3 +10,11 @@ name = "persona"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5"
+tempfile = "3"
+
+[[bench]]
+name = "commands"
+harness = false
