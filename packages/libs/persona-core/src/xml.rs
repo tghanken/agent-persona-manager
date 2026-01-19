@@ -83,14 +83,16 @@ impl<'a> NodeRef<'a> {
 
 fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), PersonaError> {
     for (name, child_node) in &node.children {
+        let mut elem = BytesStart::new(name);
+
         if let Some(entity) = child_node.entity {
-            // It's an entity.
-            let mut elem = BytesStart::new(name);
             // Attribute: path
             elem.push_attribute(("path", entity.path.to_string_lossy().as_ref()));
+        }
 
-            writer.write_event(Event::Start(elem))?;
+        writer.write_event(Event::Start(elem))?;
 
+        if let Some(entity) = child_node.entity {
             // Description
             let desc_elem = BytesStart::new("description");
             writer.write_event(Event::Start(desc_elem.clone()))?;
@@ -101,14 +103,10 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
 
             // Other frontmatter fields
             write_yaml_value(writer, &entity.frontmatter.other)?;
-
-            writer.write_event(Event::End(BytesEnd::new(name)))?;
-        } else {
-            let elem = BytesStart::new(name);
-            writer.write_event(Event::Start(elem.clone()))?;
-            write_node(writer, child_node)?;
-            writer.write_event(Event::End(BytesEnd::new(name)))?;
         }
+
+        write_node(writer, child_node)?;
+        writer.write_event(Event::End(BytesEnd::new(name)))?;
     }
 
     Ok(())
@@ -252,5 +250,51 @@ mod tests {
         // Should NOT escape
         assert!(xml.contains("<&>\"'"));
         assert!(xml.contains("Test & check < >"));
+    }
+
+    #[test]
+    fn test_generate_xml_header_and_children() {
+        let inputs = vec![PathBuf::from(".")];
+
+        // Represents skills/coding/HEADER.md
+        let header_entity = ParsedEntity {
+            path: PathBuf::from("./skills/coding/HEADER.md"),
+            frontmatter: Frontmatter {
+                name: "coding".to_string(), // Must match parent dir name per current parser rules
+                description: "Coding Category Description".to_string(),
+                other: serde_yaml::Value::Mapping(Mapping::new()),
+            },
+            body: "".to_string(),
+        };
+
+        // Represents skills/coding/rust/SKILL.md
+        let child_entity = ParsedEntity {
+            path: PathBuf::from("./skills/coding/rust/SKILL.md"),
+            frontmatter: Frontmatter {
+                name: "rust".to_string(),
+                description: "Rust Skill".to_string(),
+                other: serde_yaml::Value::Mapping(Mapping::new()),
+            },
+            body: "".to_string(),
+        };
+
+        let entities = vec![header_entity, child_entity];
+
+        let xml = generate_xml(&entities, &inputs).unwrap();
+
+        // Expectation:
+        // <skills>
+        //   <coding path="...">
+        //     <description>Coding Category Description</description>
+        //     <rust path="...">
+        //       <description>Rust Skill</description>
+        //     </rust>
+        //   </coding>
+        // </skills>
+
+        assert!(xml.contains("<coding path=\"./skills/coding/HEADER.md\">"));
+        assert!(xml.contains("<description>Coding Category Description</description>"));
+        assert!(xml.contains("<rust path=\"./skills/coding/rust/SKILL.md\">"));
+        assert!(xml.contains("<description>Rust Skill</description>"));
     }
 }
