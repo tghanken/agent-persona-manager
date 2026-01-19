@@ -1,7 +1,7 @@
 pub mod xml;
 #[tracing::instrument]
 pub fn hello() {
-    println!("Hello, world!");
+    tracing::info!("Hello, world!");
 }
 
 pub use persona_parser::ParsedEntity;
@@ -63,9 +63,9 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>>
     }
 
     if !errors.is_empty() {
-        eprintln!("Validation failed with {} errors:", errors.len());
+        tracing::error!("Validation failed with {} errors:", errors.len());
         for err in &errors {
-            eprintln!("- {}", err);
+            tracing::error!("- {}", err);
         }
         return Err(anyhow::anyhow!("Validation failed"));
     }
