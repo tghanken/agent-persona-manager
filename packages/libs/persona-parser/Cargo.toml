@@ -1,0 +1,18 @@
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+tracing = "0.1"
+
+[dev-dependencies]
+walkdir = { workspace = true }
+proptest = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+tempfile = "3"
+
+[package]
+name = "persona-parser"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+include = ["src/**/*", "Cargo.toml", "tests/**/*"]
