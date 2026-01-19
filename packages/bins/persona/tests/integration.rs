@@ -39,6 +39,42 @@ Use rust for systems programming.
 }
 
 #[test]
+fn test_build_valid_skill() {
+    let root = setup_temp_dir("build_valid");
+    let skill_dir = root.join("skills/coding/rust");
+    fs::create_dir_all(&skill_dir).unwrap();
+
+    let skill_file = skill_dir.join("SKILL.md");
+    let content = r#"---
+name: rust
+description: Rust programming skill
+---
+Use rust for systems programming.
+"#;
+    fs::write(&skill_file, content).unwrap();
+
+    let output_dir = root.join("output");
+
+    let cli = Cli::parse_from([
+        "persona",
+        "-i",
+        root.to_str().unwrap(),
+        "build",
+        "-o",
+        output_dir.to_str().unwrap(),
+    ]);
+
+    assert!(handle_cli(cli).is_ok());
+
+    assert!(output_dir.join("skills/coding/rust/SKILL.md").exists());
+    assert!(std::path::Path::new("AGENTS.md").exists());
+
+    // Clean up
+    fs::remove_dir_all(root).unwrap();
+    let _ = fs::remove_file("AGENTS.md");
+}
+
+#[test]
 fn test_check_invalid_skill_missing_frontmatter() {
     let root = setup_temp_dir("invalid_skill_mf");
     let skill_dir = root.join("skills/coding/rust");
