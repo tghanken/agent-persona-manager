@@ -123,62 +123,34 @@ mod tests {
     // Integration-style tests to cover handlers
     #[test]
     fn test_handle_cli_check() {
-        // Create a dummy directory to avoid "Directory not found" error if .agent missing
+        use persona_core::{collect_entities, xml::generate_xml};
+
         let temp_dir = setup_temp_dir("persona_test_check");
-        // Create a dummy AGENTS.md in the temp dir
+        let inputs_dir = temp_dir.join("inputs");
+        std::fs::create_dir(&inputs_dir).unwrap();
+        let inputs = vec![inputs_dir.clone()];
+
+        // Create a dummy skill so we have something to validate
+        let skill_dir = inputs_dir.join("skills/test/myskill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        let skill_file = skill_dir.join("SKILL.md");
+        let content = "---\nname: myskill\ndescription: Test skill\n---\nBody";
+        std::fs::write(&skill_file, content).unwrap();
+
+        // Generate expected AGENTS.md content dynamically
+        let entities = collect_entities(&inputs).unwrap();
+        let xml_content = generate_xml(&entities, &inputs).unwrap();
+
         let agents_file = temp_dir.join("AGENTS.md");
-
-        // Since input is empty or valid, xml will be generated.
-        // But collect_entities returns empty if dir is empty (no errors).
-        // Empty entities -> empty XML? generate_xml probably produces a wrapper with empty lists.
-
-        // We need to match what generate_xml produces for empty input.
-        // It's likely <persona-context>\n  <personas>\n  </personas>\n  <skills>\n  </skills>\n</persona-context> or similar.
-        // Actually, we can just run handle_cli once with build (if we could redirect output easily)
-        // or just accept failure and fix test.
-        // Let's rely on integration tests for full logic and here just ensure it runs.
-        // But handle_cli calls handle_check_command which CHECKS the file.
-        // So we MUST provide a valid file.
-
-        // Let's create a minimal valid AGENTS.md for empty input
-        let minimal_xml = "<persona-context>\n  <personas>\n  </personas>\n  <skills>\n  </skills>\n</persona-context>";
-        std::fs::write(&agents_file, minimal_xml).unwrap();
+        std::fs::write(&agents_file, xml_content).unwrap();
 
         let cli = Cli {
-            input: vec![temp_dir.clone()],
+            input: inputs,
             verbose: 0,
-            command: Commands::Check { agents_file: agents_file.clone() },
+            command: Commands::Check { agents_file },
         };
 
-        // This might fail if minimal_xml doesn't match EXACTLY what generate_xml produces for empty input.
-        // To be safe, we can use generate_xml to produce it.
-        // But generate_xml is in persona_core which is a dependency.
-
-        // For this test, maybe it's easier to assert that it FAILS if file is missing/wrong,
-        // or just update the command struct construction.
-        // Let's just update the struct construction and expect it to FAIL because file is missing (or empty dir behavior).
-        // Wait, assert!(handle_cli(cli).is_ok()); was the old assertion.
-
-        // Let's try to make it fail-safe.
-        // If we don't create the file, it will fail.
-        // If we create a wrong file, it will fail.
-
-        // I will just update the struct construction here.
-        // And I'll comment out the assertion or expect error if file missing.
-        // Actually, `handle_cli` returns Result.
-
-        // Let's verify what happens with empty input.
-        // collect_entities([]) -> Ok([])
-        // generate_xml([], []) -> "..."
-
-        // So I'll just skip the deep check in unit test and leave it to integration test.
-        // Or I can mock the file check by creating it.
-        // Let's try to get the expected XML by calling the library function?
-        // use persona_core::xml::generate_xml; is not available here easily (it is but requires deps).
-
-        // Let's just update the construction for now and let it be `is_err()` because file is missing.
-        // Or better: update the test to expect error due to missing file.
-        assert!(handle_cli(cli).is_err()); // Missing AGENTS.md
+        assert!(handle_cli(cli).is_ok());
         std::fs::remove_dir_all(temp_dir).unwrap();
     }
 
