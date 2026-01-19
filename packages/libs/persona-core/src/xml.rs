@@ -1,4 +1,4 @@
-use crate::PersonaError;
+use crate::{EntityOrHeader, Header, PersonaError};
 use persona_parser::ParsedEntity;
 use quick_xml::Writer;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
@@ -6,10 +6,10 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 
-pub fn generate_xml(entities: &[ParsedEntity], inputs: &[PathBuf]) -> Result<String, PersonaError> {
+pub fn generate_xml(items: &[EntityOrHeader], inputs: &[PathBuf]) -> Result<String, PersonaError> {
     let mut root = NodeRef::new();
-    for entity in entities {
-        let path = &entity.path;
+    for item in items {
+        let path = item.path();
 
         let mut relative_path = None;
         for input in inputs {
@@ -21,11 +21,11 @@ pub fn generate_xml(entities: &[ParsedEntity], inputs: &[PathBuf]) -> Result<Str
 
         let rel_path = match relative_path {
             Some(p) => p,
-            None => path.as_path(),
+            None => path,
         };
 
         let parent = rel_path.parent().ok_or_else(|| {
-            PersonaError::Serialization(format!("Entity has no parent directory: {:?}", path))
+            PersonaError::Serialization(format!("Item has no parent directory: {:?}", path))
         })?;
 
         let components: Vec<String> = parent
@@ -42,13 +42,26 @@ pub fn generate_xml(entities: &[ParsedEntity], inputs: &[PathBuf]) -> Result<Str
                 .or_insert_with(NodeRef::new);
         }
 
-        if current_node.entity.is_some() {
-            return Err(PersonaError::Serialization(format!(
-                "Duplicate entity at path {:?}",
-                path
-            )));
+        match item {
+            EntityOrHeader::Entity(e) => {
+                if current_node.entity.is_some() {
+                    return Err(PersonaError::Serialization(format!(
+                        "Duplicate entity at path {:?}",
+                        path
+                    )));
+                }
+                current_node.entity = Some(e);
+            }
+            EntityOrHeader::Header(h) => {
+                if current_node.header.is_some() {
+                    return Err(PersonaError::Serialization(format!(
+                        "Duplicate header at path {:?}",
+                        path
+                    )));
+                }
+                current_node.header = Some(h);
+            }
         }
-        current_node.entity = Some(entity);
     }
 
     // 2. Generate XML
@@ -70,6 +83,7 @@ pub fn generate_xml(entities: &[ParsedEntity], inputs: &[PathBuf]) -> Result<Str
 struct NodeRef<'a> {
     children: BTreeMap<String, NodeRef<'a>>,
     entity: Option<&'a ParsedEntity>,
+    header: Option<&'a Header>,
 }
 
 impl<'a> NodeRef<'a> {
@@ -77,20 +91,35 @@ impl<'a> NodeRef<'a> {
         Self {
             children: BTreeMap::new(),
             entity: None,
+            header: None,
         }
     }
 }
 
 fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), PersonaError> {
     for (name, child_node) in &node.children {
+        let mut elem = BytesStart::new(name);
+
         if let Some(entity) = child_node.entity {
-            // It's an entity.
-            let mut elem = BytesStart::new(name);
             // Attribute: path
             elem.push_attribute(("path", entity.path.to_string_lossy().as_ref()));
+        } else if let Some(header) = child_node.header {
+            // Attribute: path from header if no entity present?
+            // Or typically categories with headers don't have an entity file for themselves.
+            // We can put the header path.
+            elem.push_attribute(("path", header.path.to_string_lossy().as_ref()));
+        }
 
-            writer.write_event(Event::Start(elem))?;
+        writer.write_event(Event::Start(elem))?;
 
+        if let Some(header) = child_node.header {
+            let desc_elem = BytesStart::new("directions");
+            writer.write_event(Event::Start(desc_elem.clone()))?;
+            writer.write_event(Event::Text(BytesText::new(header.body.trim())))?;
+            writer.write_event(Event::End(BytesEnd::new("directions")))?;
+        }
+
+        if let Some(entity) = child_node.entity {
             // Description
             let desc_elem = BytesStart::new("description");
             writer.write_event(Event::Start(desc_elem.clone()))?;
@@ -101,14 +130,10 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
 
             // Other frontmatter fields
             write_yaml_value(writer, &entity.frontmatter.other)?;
-
-            writer.write_event(Event::End(BytesEnd::new(name)))?;
-        } else {
-            let elem = BytesStart::new(name);
-            writer.write_event(Event::Start(elem.clone()))?;
-            write_node(writer, child_node)?;
-            writer.write_event(Event::End(BytesEnd::new(name)))?;
         }
+
+        write_node(writer, child_node)?;
+        writer.write_event(Event::End(BytesEnd::new(name)))?;
     }
 
     Ok(())
@@ -176,7 +201,7 @@ mod tests {
             serde_yaml::Value::String("MIT".to_string()),
         );
 
-        let entity1 = ParsedEntity {
+        let entity1 = EntityOrHeader::Entity(ParsedEntity {
             path: PathBuf::from("./skills/coding/python-helper/SKILL.md"),
             frontmatter: Frontmatter {
                 name: "python-helper".to_string(),
@@ -184,7 +209,7 @@ mod tests {
                 other: serde_yaml::Value::Mapping(entity1_other),
             },
             body: "".to_string(),
-        };
+        });
 
         let mut entity2_other = Mapping::new();
         entity2_other.insert(
@@ -192,7 +217,7 @@ mod tests {
             serde_yaml::Value::String("Inspirational".to_string()),
         );
 
-        let entity2 = ParsedEntity {
+        let entity2 = EntityOrHeader::Entity(ParsedEntity {
             path: PathBuf::from("./personas/creative/writer/PERSONA.md"),
             frontmatter: Frontmatter {
                 name: "writer".to_string(),
@@ -200,11 +225,11 @@ mod tests {
                 other: serde_yaml::Value::Mapping(entity2_other),
             },
             body: "".to_string(),
-        };
+        });
 
-        let entities = vec![entity1, entity2];
+        let items = vec![entity1, entity2];
 
-        let xml = generate_xml(&entities, &inputs).unwrap();
+        let xml = generate_xml(&items, &inputs).unwrap();
 
         // BTreeMap sorts keys. personas < skills.
         let expected_xml = r#"<persona-context>
@@ -237,7 +262,7 @@ mod tests {
             serde_yaml::Value::String("<&>\"'".to_string()),
         );
 
-        let entity = ParsedEntity {
+        let entity = EntityOrHeader::Entity(ParsedEntity {
             path: PathBuf::from("category/entity/ENTITY.md"),
             frontmatter: Frontmatter {
                 name: "entity".to_string(),
@@ -245,12 +270,53 @@ mod tests {
                 other: serde_yaml::Value::Mapping(other),
             },
             body: "".to_string(),
-        };
+        });
 
         let xml = generate_xml(&[entity], &inputs).unwrap();
 
         // Should NOT escape
         assert!(xml.contains("<&>\"'"));
         assert!(xml.contains("Test & check < >"));
+    }
+
+    #[test]
+    fn test_generate_xml_header_and_children() {
+        let inputs = vec![PathBuf::from(".")];
+
+        // Represents skills/coding/HEADER.md
+        let header = EntityOrHeader::Header(Header {
+            path: PathBuf::from("./skills/coding/HEADER.md"),
+            body: "Coding Category Description".to_string(),
+        });
+
+        // Represents skills/coding/rust/SKILL.md
+        let child_entity = EntityOrHeader::Entity(ParsedEntity {
+            path: PathBuf::from("./skills/coding/rust/SKILL.md"),
+            frontmatter: Frontmatter {
+                name: "rust".to_string(),
+                description: "Rust Skill".to_string(),
+                other: serde_yaml::Value::Mapping(Mapping::new()),
+            },
+            body: "".to_string(),
+        });
+
+        let items = vec![header, child_entity];
+
+        let xml = generate_xml(&items, &inputs).unwrap();
+
+        // Expectation:
+        // <skills>
+        //   <coding path="...">
+        //     <directions>Coding Category Description</directions>
+        //     <rust path="...">
+        //       <description>Rust Skill</description>
+        //     </rust>
+        //   </coding>
+        // </skills>
+
+        assert!(xml.contains("<coding path=\"./skills/coding/HEADER.md\">"));
+        assert!(xml.contains("<directions>Coding Category Description</directions>"));
+        assert!(xml.contains("<rust path=\"./skills/coding/rust/SKILL.md\">"));
+        assert!(xml.contains("<description>Rust Skill</description>"));
     }
 }

@@ -9,6 +9,27 @@ use persona_parser::{MarkdownParser, PersonaParser as _};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+#[derive(Debug)]
+pub struct Header {
+    pub path: PathBuf,
+    pub body: String,
+}
+
+#[derive(Debug)]
+pub enum EntityOrHeader {
+    Entity(ParsedEntity),
+    Header(Header),
+}
+
+impl EntityOrHeader {
+    pub fn path(&self) -> &std::path::Path {
+        match self {
+            EntityOrHeader::Entity(e) => &e.path,
+            EntityOrHeader::Header(h) => &h.path,
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum PersonaError {
     #[error("Directory '{0}' does not exist")]
@@ -22,9 +43,9 @@ pub enum PersonaError {
 }
 
 #[tracing::instrument]
-pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>> {
+pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<EntityOrHeader>> {
     let mut errors = Vec::new();
-    let mut entities = Vec::new();
+    let mut items = Vec::new();
     let parser = MarkdownParser;
 
     for dir in inputs {
@@ -42,17 +63,38 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>>
                     if extension == "md" {
                         let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
-                        // Check if file stem is non-empty and has NO lowercase chars
-                        let is_all_caps =
-                            !file_stem.is_empty() && !file_stem.chars().any(|c| c.is_lowercase());
-
-                        if is_all_caps {
-                            match parser.parse(path) {
-                                Ok(entity) => entities.push(entity),
+                        let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                        if file_name == "HEADER.md" {
+                            match std::fs::read_to_string(path) {
+                                Ok(content) => {
+                                    items.push(EntityOrHeader::Header(Header {
+                                        path: path.to_path_buf(),
+                                        body: content,
+                                    }));
+                                }
                                 Err(e) => {
-                                    let msg = format!("{}: {}", path.display(), e);
-                                    tracing::error!("Validation error: {}", msg);
+                                    let msg = format!(
+                                        "Failed to read HEADER.md at {}: {}",
+                                        path.display(),
+                                        e
+                                    );
+                                    tracing::error!("{}", msg);
                                     errors.push(msg);
+                                }
+                            }
+                        } else {
+                            // Check if file stem is non-empty and has NO lowercase chars
+                            let is_all_caps = !file_stem.is_empty()
+                                && !file_stem.chars().any(|c| c.is_lowercase());
+
+                            if is_all_caps {
+                                match parser.parse(path) {
+                                    Ok(entity) => items.push(EntityOrHeader::Entity(entity)),
+                                    Err(e) => {
+                                        let msg = format!("{}: {}", path.display(), e);
+                                        tracing::error!("Validation error: {}", msg);
+                                        errors.push(msg);
+                                    }
                                 }
                             }
                         }
@@ -70,7 +112,7 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>>
         return Err(anyhow::anyhow!("Validation failed"));
     }
 
-    Ok(entities)
+    Ok(items)
 }
 
 #[tracing::instrument]
@@ -94,7 +136,7 @@ pub fn list_files(dir: &str) -> Result<Vec<std::path::PathBuf>, PersonaError> {
 
 #[tracing::instrument(skip(writer))]
 pub fn print_hierarchy(
-    entities: &[ParsedEntity],
+    items: &[EntityOrHeader],
     inputs: &[PathBuf],
     mut writer: impl std::io::Write,
 ) -> std::io::Result<()> {
@@ -129,10 +171,11 @@ pub fn print_hierarchy(
 
     let mut root = Node::new();
 
-    for entity in entities {
+    for item in items {
+        let path = item.path();
         let mut relative_path = None;
         for input in inputs {
-            if let Ok(rel) = entity.path.strip_prefix(input) {
+            if let Ok(rel) = path.strip_prefix(input) {
                 if let Some(parent) = rel.parent() {
                     relative_path = Some(parent.to_path_buf());
                     break;
@@ -140,16 +183,28 @@ pub fn print_hierarchy(
             }
         }
 
-        if let Some(path) = relative_path {
-            if path.as_os_str().is_empty() {
-                root.insert_name(entity.frontmatter.name.clone());
+        if let Some(p) = relative_path {
+            if p.as_os_str().is_empty() {
+                match item {
+                    EntityOrHeader::Entity(e) => root.insert_name(e.frontmatter.name.clone()),
+                    EntityOrHeader::Header(h) => {
+                        let parent_name = h
+                            .path
+                            .parent()
+                            .and_then(|p| p.file_name())
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+                        root.insert_name(parent_name);
+                    }
+                }
             } else {
-                root.insert(&path);
+                root.insert(&p);
             }
         } else {
             tracing::warn!(
-                "Could not determine input root for entity: {}",
-                entity.path.display()
+                "Could not determine input root for item: {}",
+                path.display()
             );
         }
     }
@@ -173,8 +228,8 @@ mod tests {
         use persona_parser::Frontmatter;
 
         let inputs = vec![PathBuf::from("/root")];
-        let entities = vec![
-            ParsedEntity {
+        let items = vec![
+            EntityOrHeader::Entity(ParsedEntity {
                 path: PathBuf::from("/root/cat/sub/ent/ENT.md"),
                 frontmatter: Frontmatter {
                     name: "ent".to_string(),
@@ -182,8 +237,8 @@ mod tests {
                     other: Default::default(),
                 },
                 body: "".to_string(),
-            },
-            ParsedEntity {
+            }),
+            EntityOrHeader::Entity(ParsedEntity {
                 path: PathBuf::from("/root/cat/other/OTHER.md"),
                 frontmatter: Frontmatter {
                     name: "other".to_string(),
@@ -191,11 +246,11 @@ mod tests {
                     other: Default::default(),
                 },
                 body: "".to_string(),
-            },
+            }),
         ];
 
         let mut output = Vec::new();
-        print_hierarchy(&entities, &inputs, &mut output).unwrap();
+        print_hierarchy(&items, &inputs, &mut output).unwrap();
         let output_str = String::from_utf8(output).unwrap();
 
         println!("{}", output_str);
@@ -209,7 +264,7 @@ mod tests {
         use persona_parser::Frontmatter;
 
         let inputs = vec![PathBuf::from("/root/specs")];
-        let entities = vec![ParsedEntity {
+        let items = vec![EntityOrHeader::Entity(ParsedEntity {
             path: PathBuf::from("/root/specs/SPECS.md"),
             frontmatter: Frontmatter {
                 name: "specs".to_string(),
@@ -217,10 +272,10 @@ mod tests {
                 other: Default::default(),
             },
             body: "".to_string(),
-        }];
+        })];
 
         let mut output = Vec::new();
-        print_hierarchy(&entities, &inputs, &mut output).unwrap();
+        print_hierarchy(&items, &inputs, &mut output).unwrap();
         let output_str = String::from_utf8(output).unwrap();
 
         println!("{}", output_str);
@@ -264,9 +319,12 @@ mod tests {
         // Test again
         let result = collect_entities(&inputs);
         assert!(result.is_ok());
-        let entities = result.unwrap();
-        assert_eq!(entities.len(), 1);
-        assert_eq!(entities[0].frontmatter.name, "entity1");
+        let items = result.unwrap();
+        assert_eq!(items.len(), 1);
+        match &items[0] {
+            EntityOrHeader::Entity(e) => assert_eq!(e.frontmatter.name, "entity1"),
+            _ => panic!("Expected entity"),
+        }
 
         // Cleanup
         fs::remove_dir_all(&temp_dir).unwrap();
