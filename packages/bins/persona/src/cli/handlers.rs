@@ -1,4 +1,4 @@
-use persona_core::{list_files, print_files, validate_inputs};
+use persona_core::{collect_entities, print_hierarchy, validate_inputs};
 use std::path::PathBuf;
 use tracing::Level;
 
@@ -34,16 +34,8 @@ pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
 
 #[tracing::instrument]
 fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
-    let mut all_files = Vec::new();
-
-    for dir in inputs {
-        let dir_str = dir.to_string_lossy();
-        match list_files(&dir_str) {
-            Ok(files) => all_files.extend(files),
-            Err(e) => tracing::warn!("Error listing files in {}: {}", dir_str, e),
-        }
-    }
-    print_files(&all_files, std::io::stdout())?;
+    let entities = collect_entities(inputs)?;
+    print_hierarchy(&entities, inputs, std::io::stdout())?;
     Ok(())
 }
 
