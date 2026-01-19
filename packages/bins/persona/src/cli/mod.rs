@@ -24,7 +24,10 @@ pub struct Cli {
 #[derive(Subcommand, Debug, PartialEq)]
 pub enum Commands {
     #[command(about = "Validate agent skill definitions")]
-    Check,
+    Check {
+        #[arg(long, default_value = "AGENTS.md")]
+        agents_file: PathBuf,
+    },
     #[command(about = "List available agent skills")]
     List,
     #[command(about = "Build the agent knowledge summary")]
@@ -49,7 +52,7 @@ mod tests {
     fn test_check_command_parsing() {
         let cli = Cli::parse_from(["persona", "check"]);
         match cli.command {
-            Commands::Check => (),
+            Commands::Check { agents_file } => assert_eq!(agents_file, PathBuf::from("AGENTS.md")),
             _ => panic!("Expected Check command"),
         }
     }
@@ -82,7 +85,7 @@ mod tests {
         );
         assert_eq!(cli.verbose, 1);
         match cli.command {
-            Commands::Check => (),
+            Commands::Check { .. } => (),
             _ => panic!("Expected Check command"),
         }
     }
@@ -120,14 +123,33 @@ mod tests {
     // Integration-style tests to cover handlers
     #[test]
     fn test_handle_cli_check() {
-        // Create a dummy directory to avoid "Directory not found" error if .agent missing
+        use persona_core::{collect_entities, xml::generate_xml};
+
         let temp_dir = setup_temp_dir("persona_test_check");
+        let inputs_dir = temp_dir.join("inputs");
+        std::fs::create_dir(&inputs_dir).unwrap();
+        let inputs = vec![inputs_dir.clone()];
+
+        // Create a dummy skill so we have something to validate
+        let skill_dir = inputs_dir.join("skills/test/myskill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        let skill_file = skill_dir.join("SKILL.md");
+        let content = "---\nname: myskill\ndescription: Test skill\n---\nBody";
+        std::fs::write(&skill_file, content).unwrap();
+
+        // Generate expected AGENTS.md content dynamically
+        let entities = collect_entities(&inputs).unwrap();
+        let xml_content = generate_xml(&entities, &inputs).unwrap();
+
+        let agents_file = temp_dir.join("AGENTS.md");
+        std::fs::write(&agents_file, xml_content).unwrap();
 
         let cli = Cli {
-            input: vec![temp_dir.clone()],
+            input: inputs,
             verbose: 0,
-            command: Commands::Check,
+            command: Commands::Check { agents_file },
         };
+
         assert!(handle_cli(cli).is_ok());
         std::fs::remove_dir_all(temp_dir).unwrap();
     }

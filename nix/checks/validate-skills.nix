@@ -11,6 +11,7 @@ in
       root = ../..;
       fileset = pkgs.lib.fileset.unions [
         ../../.agent
+        ../../AGENTS.md
       ];
     };
 

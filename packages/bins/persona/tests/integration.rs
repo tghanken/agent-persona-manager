@@ -15,7 +15,10 @@ fn setup_temp_dir(name: &str) -> PathBuf {
 
 #[test]
 fn test_check_valid_skill() {
-    let root = setup_temp_dir("valid_skill");
+    let temp = setup_temp_dir("valid_skill");
+    let root = temp.join("inputs");
+    fs::create_dir(&root).unwrap();
+
     let skill_dir = root.join("skills/coding/rust");
     fs::create_dir_all(&skill_dir).unwrap();
 
@@ -28,14 +31,109 @@ Use rust for systems programming.
 "#;
     fs::write(&skill_file, content).unwrap();
 
+    // Generate expected AGENTS.md content
+    let agents_file = temp.join("AGENTS.md");
+    // Note: generate_xml uses entity.path for the path attribute.
+    // Since we pass absolute path as input, entity.path is absolute.
+    // Ideally we should use relative paths, but for this test we match what generate_xml produces.
+    let expected_xml = format!(
+        r#"<persona-context>
+  <skills>
+    <coding>
+      <rust path="{}">
+        <description>Rust programming skill</description>
+      </rust>
+    </coding>
+  </skills>
+</persona-context>"#,
+        skill_file.to_string_lossy()
+    );
+    fs::write(&agents_file, &expected_xml).unwrap();
+
     // Mock CLI arguments
-    // We can't easily use Cli::parse_from because it expects string arguments and parses them.
-    // But we can construct Cli directly or use parse_from.
-    let cli = Cli::parse_from(["persona", "-i", root.to_str().unwrap(), "check"]);
+    let cli = Cli::parse_from([
+        "persona",
+        "-i",
+        root.to_str().unwrap(),
+        "check",
+        "--agents-file",
+        agents_file.to_str().unwrap(),
+    ]);
 
-    assert!(handle_cli(cli).is_ok());
+    handle_cli(cli).unwrap();
 
-    fs::remove_dir_all(root).unwrap();
+    fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn test_check_fails_on_outdated_agents_md() {
+    let temp = setup_temp_dir("outdated_check");
+    let root = temp.join("inputs");
+    fs::create_dir(&root).unwrap();
+
+    let skill_dir = root.join("skills/coding/rust");
+    fs::create_dir_all(&skill_dir).unwrap();
+
+    let skill_file = skill_dir.join("SKILL.md");
+    let content = r#"---
+name: rust
+description: Rust programming skill
+---
+Use rust for systems programming.
+"#;
+    fs::write(&skill_file, content).unwrap();
+
+    // Write incorrect AGENTS.md
+    let agents_file = temp.join("AGENTS.md");
+    fs::write(&agents_file, "INVALID CONTENT").unwrap();
+
+    let cli = Cli::parse_from([
+        "persona",
+        "-i",
+        root.to_str().unwrap(),
+        "check",
+        "--agents-file",
+        agents_file.to_str().unwrap(),
+    ]);
+
+    assert!(handle_cli(cli).is_err());
+
+    fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn test_check_fails_on_missing_agents_md() {
+    let temp = setup_temp_dir("missing_check");
+    let root = temp.join("inputs");
+    fs::create_dir(&root).unwrap();
+
+    let skill_dir = root.join("skills/coding/rust");
+    fs::create_dir_all(&skill_dir).unwrap();
+
+    let skill_file = skill_dir.join("SKILL.md");
+    let content = r#"---
+name: rust
+description: Rust programming skill
+---
+Use rust for systems programming.
+"#;
+    fs::write(&skill_file, content).unwrap();
+
+    let agents_file = temp.join("AGENTS.md");
+    // Do NOT write AGENTS.md
+
+    let cli = Cli::parse_from([
+        "persona",
+        "-i",
+        root.to_str().unwrap(),
+        "check",
+        "--agents-file",
+        agents_file.to_str().unwrap(),
+    ]);
+
+    assert!(handle_cli(cli).is_err());
+
+    fs::remove_dir_all(temp).unwrap();
 }
 
 #[test]
@@ -86,7 +184,15 @@ Use rust for systems programming.
 "#;
     fs::write(&skill_file, content).unwrap();
 
-    let cli = Cli::parse_from(["persona", "-i", root.to_str().unwrap(), "check"]);
+    let agents_file = root.join("AGENTS.md");
+    let cli = Cli::parse_from([
+        "persona",
+        "-i",
+        root.to_str().unwrap(),
+        "check",
+        "--agents-file",
+        agents_file.to_str().unwrap(),
+    ]);
 
     assert!(handle_cli(cli).is_err());
 
@@ -108,7 +214,15 @@ Use rust.
 "#;
     fs::write(&skill_file, content).unwrap();
 
-    let cli = Cli::parse_from(["persona", "-i", root.to_str().unwrap(), "check"]);
+    let agents_file = root.join("AGENTS.md");
+    let cli = Cli::parse_from([
+        "persona",
+        "-i",
+        root.to_str().unwrap(),
+        "check",
+        "--agents-file",
+        agents_file.to_str().unwrap(),
+    ]);
 
     assert!(handle_cli(cli).is_err());
 
