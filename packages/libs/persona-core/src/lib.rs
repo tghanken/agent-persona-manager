@@ -1,3 +1,4 @@
+pub mod xml;
 #[tracing::instrument]
 pub fn hello() {
     println!("Hello, world!");
@@ -7,6 +8,18 @@ pub use persona_parser::ParsedEntity;
 use persona_parser::{MarkdownParser, PersonaParser as _};
 use std::path::PathBuf;
 use walkdir::WalkDir;
+
+#[derive(thiserror::Error, Debug)]
+pub enum PersonaError {
+    #[error("Directory '{0}' does not exist")]
+    DirectoryNotFound(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("XML generation error: {0}")]
+    Xml(#[from] quick_xml::Error),
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+}
 
 #[tracing::instrument]
 pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>> {
@@ -60,6 +73,25 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>>
     Ok(entities)
 }
 
+#[tracing::instrument]
+pub fn list_files(dir: &str) -> Result<Vec<std::path::PathBuf>, PersonaError> {
+    use std::path::Path;
+    use walkdir::WalkDir;
+
+    if !Path::new(dir).exists() {
+        tracing::error!("Directory '{}' does not exist.", dir);
+        return Err(PersonaError::DirectoryNotFound(dir.to_string()));
+    }
+
+    let mut files = Vec::new();
+    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_type().is_file() {
+            files.push(entry.path().to_path_buf());
+        }
+    }
+    Ok(files)
+}
+
 #[tracing::instrument(skip(writer))]
 pub fn print_hierarchy(
     entities: &[ParsedEntity],
@@ -79,10 +111,7 @@ pub fn print_hierarchy(
             let mut current = self;
             for component in path.components() {
                 let name = component.as_os_str().to_string_lossy().to_string();
-                current = current
-                    .children
-                    .entry(name)
-                    .or_insert_with(Node::new);
+                current = current.children.entry(name).or_insert_with(Node::new);
             }
         }
         fn insert_name(&mut self, name: String) {
@@ -118,7 +147,10 @@ pub fn print_hierarchy(
                 root.insert(&path);
             }
         } else {
-             tracing::warn!("Could not determine input root for entity: {}", entity.path.display());
+            tracing::warn!(
+                "Could not determine input root for entity: {}",
+                entity.path.display()
+            );
         }
     }
 
@@ -177,17 +209,15 @@ mod tests {
         use persona_parser::Frontmatter;
 
         let inputs = vec![PathBuf::from("/root/specs")];
-        let entities = vec![
-            ParsedEntity {
-                path: PathBuf::from("/root/specs/SPECS.md"),
-                frontmatter: Frontmatter {
-                    name: "specs".to_string(),
-                    description: "".to_string(),
-                    other: Default::default(),
-                },
-                body: "".to_string(),
+        let entities = vec![ParsedEntity {
+            path: PathBuf::from("/root/specs/SPECS.md"),
+            frontmatter: Frontmatter {
+                name: "specs".to_string(),
+                description: "".to_string(),
+                other: Default::default(),
             },
-        ];
+            body: "".to_string(),
+        }];
 
         let mut output = Vec::new();
         print_hierarchy(&entities, &inputs, &mut output).unwrap();
@@ -240,5 +270,36 @@ mod tests {
 
         // Cleanup
         fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_list_files() {
+        // Create a temporary directory structure
+        let temp_dir = std::env::temp_dir().join("persona_test_list_files");
+        if temp_dir.exists() {
+            fs::remove_dir_all(&temp_dir).unwrap();
+        }
+        fs::create_dir_all(&temp_dir).unwrap();
+        let file1 = temp_dir.join("file1.txt");
+        let sub_dir = temp_dir.join("sub");
+        let file2 = sub_dir.join("file2.txt");
+
+        fs::write(&file1, "content").unwrap();
+        fs::create_dir(&sub_dir).unwrap();
+        fs::write(&file2, "content").unwrap();
+
+        let files = list_files(temp_dir.to_str().unwrap()).unwrap();
+
+        assert!(files.contains(&file1));
+        assert!(files.contains(&file2));
+
+        // Cleanup
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_list_files_non_existent() {
+        let result = list_files("non_existent_directory_xyz");
+        assert!(result.is_err());
     }
 }

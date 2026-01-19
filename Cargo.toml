@@ -10,11 +10,13 @@ members = ["packages/bins/*", "packages/libs/*"]
 anyhow = "1"
 persona-core = { path = "packages/libs/persona-core" }
 persona-parser = { path = "packages/libs/persona-parser" }
+serde = { version = "^1.0.228", features = ["derive"] }    # unified
+serde_yaml = "^0.9.34"                                     # unified
 thiserror = "2"
 tracing = "^0.1.44"
 walkdir = "2"
 
 [workspace.package]
-rust-version = "1.85.0"
+rust-version = "1.87"
 version = "0.1.0"
 edition = "2024"

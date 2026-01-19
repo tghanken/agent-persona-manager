@@ -1,14 +1,14 @@
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+serde = { workspace = true }      # unified
+serde_yaml = { workspace = true } # unified
 thiserror = { workspace = true }
 tracing = "0.1"
 
 [dev-dependencies]
-walkdir = { workspace = true }
 proptest = "1.0"
-uuid = { version = "1.0", features = ["v4"] }
 tempfile = "3"
+uuid = { version = "1.0", features = ["v4"] }
+walkdir = { workspace = true }
 
 [package]
 name = "persona-parser"
