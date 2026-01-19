@@ -111,23 +111,38 @@ mod tests {
     // Integration-style tests to cover handlers
     #[test]
     fn test_handle_cli_check() {
+        // Create a dummy directory to avoid "Directory not found" error if .agent missing
+        let temp_dir = std::env::temp_dir().join("persona_test_check");
+        if temp_dir.exists() {
+             std::fs::remove_dir_all(&temp_dir).unwrap();
+        }
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
         let cli = Cli {
-            input: vec![],
+            input: vec![temp_dir.clone()],
             verbose: 0,
             command: Commands::Check,
         };
         assert!(handle_cli(cli).is_ok());
+        std::fs::remove_dir_all(temp_dir).unwrap();
     }
 
     #[test]
     fn test_handle_cli_list() {
+        let temp_dir = std::env::temp_dir().join("persona_test_list");
+        if temp_dir.exists() {
+             std::fs::remove_dir_all(&temp_dir).unwrap();
+        }
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
         let cli = Cli {
-            input: vec![],
+            input: vec![temp_dir.clone()],
             verbose: 0,
             command: Commands::List,
         };
         // This might print to stdout, but should return Ok
         assert!(handle_cli(cli).is_ok());
+        std::fs::remove_dir_all(temp_dir).unwrap();
     }
 
     #[test]
