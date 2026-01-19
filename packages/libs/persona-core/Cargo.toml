@@ -1,5 +1,5 @@
 [dependencies]
-anyhow = { version = "1" }
+anyhow = { workspace = true }
 persona-parser = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

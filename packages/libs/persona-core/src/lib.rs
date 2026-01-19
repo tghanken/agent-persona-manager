@@ -4,8 +4,8 @@ pub fn hello() {
 }
 
 use persona_parser::{MarkdownParser, PersonaParser as _};
-use walkdir::WalkDir;
 use std::path::PathBuf;
+use walkdir::WalkDir;
 
 #[tracing::instrument]
 pub fn validate_inputs(inputs: &[PathBuf]) -> anyhow::Result<()> {
@@ -25,13 +25,11 @@ pub fn validate_inputs(inputs: &[PathBuf]) -> anyhow::Result<()> {
             if path.is_file() {
                 if let Some(extension) = path.extension() {
                     if extension == "md" {
-                        let file_stem = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("");
+                        let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
                         // Check if file stem is non-empty and has NO lowercase chars
-                        let is_all_caps = !file_stem.is_empty() && !file_stem.chars().any(|c| c.is_lowercase());
+                        let is_all_caps =
+                            !file_stem.is_empty() && !file_stem.chars().any(|c| c.is_lowercase());
 
                         if is_all_caps {
                             if let Err(e) = parser.parse(path) {

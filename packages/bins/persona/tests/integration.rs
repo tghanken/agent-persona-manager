@@ -1,5 +1,5 @@
 use clap::Parser;
-use persona::{handle_cli, Cli};
+use persona::{Cli, handle_cli};
 use std::fs;
 use std::path::PathBuf;
 
@@ -31,12 +31,7 @@ Use rust for systems programming.
     // Mock CLI arguments
     // We can't easily use Cli::parse_from because it expects string arguments and parses them.
     // But we can construct Cli directly or use parse_from.
-    let cli = Cli::parse_from([
-        "persona",
-        "-i",
-        root.to_str().unwrap(),
-        "check",
-    ]);
+    let cli = Cli::parse_from(["persona", "-i", root.to_str().unwrap(), "check"]);
 
     assert!(handle_cli(cli).is_ok());
 
@@ -55,12 +50,7 @@ Use rust for systems programming.
 "#;
     fs::write(&skill_file, content).unwrap();
 
-    let cli = Cli::parse_from([
-        "persona",
-        "-i",
-        root.to_str().unwrap(),
-        "check",
-    ]);
+    let cli = Cli::parse_from(["persona", "-i", root.to_str().unwrap(), "check"]);
 
     assert!(handle_cli(cli).is_err());
 
@@ -82,12 +72,7 @@ Use rust.
 "#;
     fs::write(&skill_file, content).unwrap();
 
-    let cli = Cli::parse_from([
-        "persona",
-        "-i",
-        root.to_str().unwrap(),
-        "check",
-    ]);
+    let cli = Cli::parse_from(["persona", "-i", root.to_str().unwrap(), "check"]);
 
     assert!(handle_cli(cli).is_err());
 

@@ -114,7 +114,7 @@ mod tests {
         // Create a dummy directory to avoid "Directory not found" error if .agent missing
         let temp_dir = std::env::temp_dir().join("persona_test_check");
         if temp_dir.exists() {
-             std::fs::remove_dir_all(&temp_dir).unwrap();
+            std::fs::remove_dir_all(&temp_dir).unwrap();
         }
         std::fs::create_dir_all(&temp_dir).unwrap();
 
@@ -131,7 +131,7 @@ mod tests {
     fn test_handle_cli_list() {
         let temp_dir = std::env::temp_dir().join("persona_test_list");
         if temp_dir.exists() {
-             std::fs::remove_dir_all(&temp_dir).unwrap();
+            std::fs::remove_dir_all(&temp_dir).unwrap();
         }
         std::fs::create_dir_all(&temp_dir).unwrap();
 
