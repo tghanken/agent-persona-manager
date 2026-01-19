@@ -1,29 +1,40 @@
+use crate::PersonaError;
+use persona_parser::ParsedEntity;
+use quick_xml::Writer;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use std::collections::BTreeMap;
 use std::io::Write;
-use persona_parser::ParsedEntity;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
-use quick_xml::Writer;
-use crate::PersonaError;
 
 pub fn generate_xml(entities: &[ParsedEntity]) -> Result<String, PersonaError> {
     let mut root = NodeRef::new();
     for entity in entities {
         let path = &entity.path;
-        let parent = path.parent().ok_or_else(|| PersonaError::Serialization(format!("Entity has no parent directory: {:?}", path)))?;
+        let parent = path.parent().ok_or_else(|| {
+            PersonaError::Serialization(format!("Entity has no parent directory: {:?}", path))
+        })?;
 
-        let mut components: Vec<String> = parent.iter().map(|c| c.to_string_lossy().to_string()).collect();
+        let mut components: Vec<String> = parent
+            .iter()
+            .map(|c| c.to_string_lossy().to_string())
+            .collect();
 
-         if components.first().map(|s| s == ".").unwrap_or(false) {
+        if components.first().map(|s| s == ".").unwrap_or(false) {
             components.remove(0);
         }
 
         let mut current_node = &mut root;
         for component in components {
-             current_node = current_node.children.entry(component).or_insert_with(NodeRef::new);
+            current_node = current_node
+                .children
+                .entry(component)
+                .or_insert_with(NodeRef::new);
         }
 
         if current_node.entity.is_some() {
-             return Err(PersonaError::Serialization(format!("Duplicate entity at path {:?}", path)));
+            return Err(PersonaError::Serialization(format!(
+                "Duplicate entity at path {:?}",
+                path
+            )));
         }
         current_node.entity = Some(entity);
     }
@@ -39,7 +50,8 @@ pub fn generate_xml(entities: &[ParsedEntity]) -> Result<String, PersonaError> {
 
     writer.write_event(Event::End(BytesEnd::new("persona-context")))?;
 
-    let result = String::from_utf8(writer.into_inner()).map_err(|e| PersonaError::Serialization(e.to_string()))?;
+    let result = String::from_utf8(writer.into_inner())
+        .map_err(|e| PersonaError::Serialization(e.to_string()))?;
     Ok(result)
 }
 
@@ -96,26 +108,31 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
 
             writer.write_event(Event::End(BytesEnd::new(name)))?;
         } else {
-             // It's a category.
-             // Only write if it has children (which it must, otherwise why is it in the tree? Well, it could be a leaf dir with no entity? No, we built tree from entities).
-             // Wait, if we built tree from entities, every leaf in the tree MUST be an entity.
-             // Intermediate nodes are just path components.
+            // It's a category.
+            // Only write if it has children (which it must, otherwise why is it in the tree? Well, it could be a leaf dir with no entity? No, we built tree from entities).
+            // Wait, if we built tree from entities, every leaf in the tree MUST be an entity.
+            // Intermediate nodes are just path components.
 
-             let elem = BytesStart::new(name);
-             writer.write_event(Event::Start(elem.clone()))?;
-             write_node(writer, child_node)?;
-             writer.write_event(Event::End(BytesEnd::new(name)))?;
+            let elem = BytesStart::new(name);
+            writer.write_event(Event::Start(elem.clone()))?;
+            write_node(writer, child_node)?;
+            writer.write_event(Event::End(BytesEnd::new(name)))?;
         }
     }
 
     Ok(())
 }
 
-fn write_yaml_value<W: Write>(writer: &mut Writer<W>, value: &serde_yaml::Value) -> Result<(), PersonaError> {
+fn write_yaml_value<W: Write>(
+    writer: &mut Writer<W>,
+    value: &serde_yaml::Value,
+) -> Result<(), PersonaError> {
     match value {
         serde_yaml::Value::Mapping(map) => {
             for (k, v) in map {
-                let key_str = k.as_str().ok_or_else(|| PersonaError::Serialization("YAML key must be a string".to_string()))?;
+                let key_str = k.as_str().ok_or_else(|| {
+                    PersonaError::Serialization("YAML key must be a string".to_string())
+                })?;
 
                 // XML tags must be valid names. Assuming keys are valid.
                 let elem = BytesStart::new(key_str);
@@ -123,16 +140,16 @@ fn write_yaml_value<W: Write>(writer: &mut Writer<W>, value: &serde_yaml::Value)
                 write_yaml_value(writer, v)?;
                 writer.write_event(Event::End(BytesEnd::new(key_str)))?;
             }
-        },
+        }
         serde_yaml::Value::String(s) => {
             writer.write_event(Event::Text(BytesText::new(s)))?;
-        },
+        }
         serde_yaml::Value::Number(n) => {
-             writer.write_event(Event::Text(BytesText::new(&n.to_string())))?;
-        },
+            writer.write_event(Event::Text(BytesText::new(&n.to_string())))?;
+        }
         serde_yaml::Value::Bool(b) => {
-             writer.write_event(Event::Text(BytesText::new(&b.to_string())))?;
-        },
+            writer.write_event(Event::Text(BytesText::new(&b.to_string())))?;
+        }
         serde_yaml::Value::Sequence(seq) => {
             // How to represent sequences?
             // Spec example doesn't show sequence.
@@ -147,16 +164,18 @@ fn write_yaml_value<W: Write>(writer: &mut Writer<W>, value: &serde_yaml::Value)
             // Let's assume for now simple scalar values as per example.
             // If complex, let's output JSON-like structure or just items.
             // Let's use <item> for now.
-             for item in seq {
-                  let elem = BytesStart::new("item");
-                  writer.write_event(Event::Start(elem.clone()))?;
-                  write_yaml_value(writer, item)?;
-                  writer.write_event(Event::End(BytesEnd::new("item")))?;
-             }
-        },
-        serde_yaml::Value::Null => {}, // Empty
+            for item in seq {
+                let elem = BytesStart::new("item");
+                writer.write_event(Event::Start(elem.clone()))?;
+                write_yaml_value(writer, item)?;
+                writer.write_event(Event::End(BytesEnd::new("item")))?;
+            }
+        }
+        serde_yaml::Value::Null => {} // Empty
         serde_yaml::Value::Tagged(_) => {
-             return Err(PersonaError::Serialization("Tagged YAML values not supported".to_string()));
+            return Err(PersonaError::Serialization(
+                "Tagged YAML values not supported".to_string(),
+            ));
         }
     }
     Ok(())
@@ -165,9 +184,9 @@ fn write_yaml_value<W: Write>(writer: &mut Writer<W>, value: &serde_yaml::Value)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use persona_parser::{Frontmatter, ParsedEntity};
     use serde_yaml::Mapping;
+    use std::path::PathBuf;
 
     #[test]
     fn test_generate_xml_example() {
@@ -178,7 +197,7 @@ mod tests {
         let mut entity1_other = Mapping::new();
         entity1_other.insert(
             serde_yaml::Value::String("license".to_string()),
-            serde_yaml::Value::String("MIT".to_string())
+            serde_yaml::Value::String("MIT".to_string()),
         );
 
         let entity1 = ParsedEntity {
@@ -194,7 +213,7 @@ mod tests {
         let mut entity2_other = Mapping::new();
         entity2_other.insert(
             serde_yaml::Value::String("tone".to_string()),
-            serde_yaml::Value::String("Inspirational".to_string())
+            serde_yaml::Value::String("Inspirational".to_string()),
         );
 
         let entity2 = ParsedEntity {
@@ -240,7 +259,7 @@ mod tests {
         let mut other = Mapping::new();
         other.insert(
             serde_yaml::Value::String("special".to_string()),
-            serde_yaml::Value::String("<&>\"'".to_string())
+            serde_yaml::Value::String("<&>\"'".to_string()),
         );
 
         let entity = ParsedEntity {
