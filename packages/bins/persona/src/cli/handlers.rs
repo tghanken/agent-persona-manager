@@ -1,24 +1,11 @@
 use persona_core::{collect_entities, print_hierarchy, xml::generate_xml};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::Level;
 
 use crate::cli::{Cli, Commands};
 
 #[tracing::instrument(skip(cli))]
 pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
-    // Initialize tracing based on verbosity
-    let log_level = match cli.verbose {
-        0 => Level::WARN,
-        1 => Level::INFO,
-        2 => Level::DEBUG,
-        _ => Level::TRACE,
-    };
-
-    let _ = tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .try_init();
-
     match cli.command {
         Commands::Check => {
             handle_check_command(&cli.input)?;
@@ -55,7 +42,7 @@ fn handle_build_command(
     let xml_content = generate_xml(&entities, inputs)?;
 
     fs::write("AGENTS.md", xml_content)?;
-    println!("Generated AGENTS.md");
+    tracing::info!("Generated AGENTS.md");
 
     if let Some(out_dir) = output {
         fs::create_dir_all(out_dir)?;
@@ -82,7 +69,7 @@ fn handle_build_command(
                 copy_dir_recursive(src_dir, &dest_dir)?;
             }
         }
-        println!("Generated output in {}", out_dir.display());
+        tracing::info!("Generated output in {}", out_dir.display());
     }
     Ok(())
 }
