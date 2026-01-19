@@ -1,4 +1,4 @@
-use persona_core::{collect_entities, print_hierarchy, validate_inputs};
+use persona_core::{collect_entities, print_hierarchy};
 use std::path::PathBuf;
 use tracing::Level;
 
@@ -41,7 +41,7 @@ fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
 
 #[tracing::instrument]
 fn handle_check_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
-    validate_inputs(inputs)?;
+    collect_entities(inputs)?;
     Ok(())
 }
 

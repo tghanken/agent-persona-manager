@@ -60,11 +60,6 @@ pub fn collect_entities(inputs: &[PathBuf]) -> anyhow::Result<Vec<ParsedEntity>>
     Ok(entities)
 }
 
-#[tracing::instrument]
-pub fn validate_inputs(inputs: &[PathBuf]) -> anyhow::Result<()> {
-    collect_entities(inputs).map(|_| ())
-}
-
 #[tracing::instrument(skip(writer))]
 pub fn print_hierarchy(
     entities: &[ParsedEntity],
@@ -142,12 +137,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_inputs() {
-        // Test with empty inputs, should pass
-        assert!(validate_inputs(&[]).is_ok());
-    }
-
-    #[test]
     fn test_print_hierarchy() {
         use persona_parser::Frontmatter;
 
@@ -179,17 +168,8 @@ mod tests {
 
         println!("{}", output_str);
 
-        // Check for hierarchy
-        assert!(output_str.contains("cat"));
-        assert!(output_str.contains("sub"));
-        assert!(output_str.contains("ent"));
-        assert!(output_str.contains("other"));
-
-        // Simple check for indentation (not robust but indicative)
-        // cat should be at start of line (indent 0)
-        // sub should be indented
-        assert!(output_str.contains("cat\n"));
-        assert!(output_str.contains("  sub\n"));
+        let expected_output = "cat\n  other\n  sub\n    ent\n";
+        assert_eq!(output_str, expected_output);
     }
 
     #[test]
