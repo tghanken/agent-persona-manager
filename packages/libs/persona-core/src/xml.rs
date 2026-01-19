@@ -70,24 +70,6 @@ impl<'a> NodeRef<'a> {
 }
 
 fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), PersonaError> {
-    // If this node has an entity, it's a leaf in terms of content, but it might still have children?
-    // Spec: "Nesting: Entity directories may contain one level of subdirectories (e.g., scripts/, assets/) which are not parsed for further entities. Deeply nested directories are not allowed."
-    // "Leaf Elements: The tag name of the leaf element is the `name` of the entity."
-    // So if a node has an entity, it shouldn't have children that are also entities (based on "not parsed for further entities").
-    // But in our tree, `children` represent subdirectories.
-    // If `node.entity` is Some, then this node corresponds to the directory `.../entity-name/`.
-    // The spec says "The XML structure mirrors the directory category/subcategory hierarchy."
-
-    // Case 1: Intermediate directory (Category/Subcategory).
-    // It has children, but no entity.
-    // XML: <category> ... children ... </category>
-
-    // Case 2: Entity directory.
-    // It has an entity.
-    // XML: <entity-name ...> ... content ... </entity-name>
-
-    // We iterate over children map to ensure order (BTreeMap).
-
     for (name, child_node) in &node.children {
         if let Some(entity) = child_node.entity {
             // It's an entity.
@@ -100,7 +82,9 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
             // Description
             let desc_elem = BytesStart::new("description");
             writer.write_event(Event::Start(desc_elem.clone()))?;
-            writer.write_event(Event::Text(BytesText::new(&entity.frontmatter.description)))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(
+                &entity.frontmatter.description,
+            )))?;
             writer.write_event(Event::End(BytesEnd::new("description")))?;
 
             // Other frontmatter fields
@@ -108,11 +92,6 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
 
             writer.write_event(Event::End(BytesEnd::new(name)))?;
         } else {
-            // It's a category.
-            // Only write if it has children (which it must, otherwise why is it in the tree? Well, it could be a leaf dir with no entity? No, we built tree from entities).
-            // Wait, if we built tree from entities, every leaf in the tree MUST be an entity.
-            // Intermediate nodes are just path components.
-
             let elem = BytesStart::new(name);
             writer.write_event(Event::Start(elem.clone()))?;
             write_node(writer, child_node)?;
@@ -142,28 +121,15 @@ fn write_yaml_value<W: Write>(
             }
         }
         serde_yaml::Value::String(s) => {
-            writer.write_event(Event::Text(BytesText::new(s)))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(s)))?;
         }
         serde_yaml::Value::Number(n) => {
-            writer.write_event(Event::Text(BytesText::new(&n.to_string())))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(n.to_string())))?;
         }
         serde_yaml::Value::Bool(b) => {
-            writer.write_event(Event::Text(BytesText::new(&b.to_string())))?;
+            writer.write_event(Event::Text(BytesText::from_escaped(b.to_string())))?;
         }
         serde_yaml::Value::Sequence(seq) => {
-            // How to represent sequences?
-            // Spec example doesn't show sequence.
-            // Usually repeated tags or <item>.
-            // Let's assume standard XML serialization: just text content joined? Or error?
-            // "Child Elements: All fields found in the YAML frontmatter of the entity."
-            // If I have `tags: [a, b]`, XML might be `<tags><a></a><b></b></tags>` (if keys are implicit?) NO.
-            // Usually `<tags><item>a</item><item>b</item></tags>` or just repeated `<tags>a</tags><tags>b</tags>` if parent handles it.
-            // But we are inside `write_yaml_value` which is called *inside* the tag for the key.
-            // So if we are in `<tags>`, and value is sequence.
-            // Maybe just stringify?
-            // Let's assume for now simple scalar values as per example.
-            // If complex, let's output JSON-like structure or just items.
-            // Let's use <item> for now.
             for item in seq {
                 let elem = BytesStart::new("item");
                 writer.write_event(Event::Start(elem.clone()))?;
@@ -230,28 +196,26 @@ mod tests {
 
         let xml = generate_xml(&entities).unwrap();
 
-        println!("{}", xml);
+        let expected_xml = r#"<persona-context>
+  <personas>
+    <creative>
+      <writer path="personas/creative/writer/PERSONA.md">
+        <description>A creative writing assistant.</description>
+        <tone>Inspirational</tone>
+      </writer>
+    </creative>
+  </personas>
+  <skills>
+    <coding>
+      <python-helper path="skills/coding/python-helper/SKILL.md">
+        <description>Assists with Python coding tasks.</description>
+        <license>MIT</license>
+      </python-helper>
+    </coding>
+  </skills>
+</persona-context>"#;
 
-        // Assertions
-        assert!(xml.contains("<persona-context>"));
-        assert!(xml.contains("<skills>"));
-        assert!(xml.contains("<coding>"));
-        assert!(xml.contains("<python-helper path=\"skills/coding/python-helper/SKILL.md\">"));
-        assert!(xml.contains("<description>Assists with Python coding tasks.</description>"));
-        assert!(xml.contains("<license>MIT</license>"));
-        assert!(xml.contains("</python-helper>"));
-        assert!(xml.contains("</coding>"));
-        assert!(xml.contains("</skills>"));
-
-        assert!(xml.contains("<personas>"));
-        assert!(xml.contains("<creative>"));
-        assert!(xml.contains("<writer path=\"personas/creative/writer/PERSONA.md\">"));
-        assert!(xml.contains("<description>A creative writing assistant.</description>"));
-        assert!(xml.contains("<tone>Inspirational</tone>"));
-        assert!(xml.contains("</writer>"));
-        assert!(xml.contains("</creative>"));
-        assert!(xml.contains("</personas>"));
-        assert!(xml.contains("</persona-context>"));
+        assert_eq!(xml, expected_xml);
     }
 
     #[test]
@@ -274,7 +238,8 @@ mod tests {
 
         let xml = generate_xml(&[entity]).unwrap();
 
-        assert!(xml.contains("&lt;&amp;&gt;&quot;&apos;"));
-        assert!(xml.contains("Test &amp; check &lt; &gt;"));
+        // Should NOT escape
+        assert!(xml.contains("<&>\"'"));
+        assert!(xml.contains("Test & check < >"));
     }
 }
