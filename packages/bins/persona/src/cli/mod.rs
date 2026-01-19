@@ -11,7 +11,7 @@ use std::path::PathBuf;
     long_about = "Persona is a CLI tool for managing agent instructions. It allows you to list available custom directions and validate their definitions to ensure they are correctly configured for use by agents."
 )]
 pub struct Cli {
-    #[arg(short, long, global = true)]
+    #[arg(short, long, global = true, default_value = ".agent")]
     pub input: Vec<PathBuf>,
 
     #[arg(short, long, action = clap::ArgAction::Count, global = true)]
@@ -108,15 +108,20 @@ mod tests {
         }
     }
 
-    // Integration-style tests to cover handlers
-    #[test]
-    fn test_handle_cli_check() {
-        // Create a dummy directory to avoid "Directory not found" error if .agent missing
-        let temp_dir = std::env::temp_dir().join("persona_test_check");
+    fn setup_temp_dir(name: &str) -> PathBuf {
+        let temp_dir = std::env::temp_dir().join(name);
         if temp_dir.exists() {
             std::fs::remove_dir_all(&temp_dir).unwrap();
         }
         std::fs::create_dir_all(&temp_dir).unwrap();
+        temp_dir
+    }
+
+    // Integration-style tests to cover handlers
+    #[test]
+    fn test_handle_cli_check() {
+        // Create a dummy directory to avoid "Directory not found" error if .agent missing
+        let temp_dir = setup_temp_dir("persona_test_check");
 
         let cli = Cli {
             input: vec![temp_dir.clone()],
@@ -129,11 +134,7 @@ mod tests {
 
     #[test]
     fn test_handle_cli_list() {
-        let temp_dir = std::env::temp_dir().join("persona_test_list");
-        if temp_dir.exists() {
-            std::fs::remove_dir_all(&temp_dir).unwrap();
-        }
-        std::fs::create_dir_all(&temp_dir).unwrap();
+        let temp_dir = setup_temp_dir("persona_test_list");
 
         let cli = Cli {
             input: vec![temp_dir.clone()],

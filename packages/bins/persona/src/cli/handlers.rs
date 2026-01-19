@@ -36,14 +36,7 @@ pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
 fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
     let mut all_files = Vec::new();
 
-    // If no inputs are provided, default to ".agent"
-    let inputs_to_use = if inputs.is_empty() {
-        vec![PathBuf::from(".agent")]
-    } else {
-        inputs.to_vec()
-    };
-
-    for dir in &inputs_to_use {
+    for dir in inputs {
         let dir_str = dir.to_string_lossy();
         match list_files(&dir_str) {
             Ok(files) => all_files.extend(files),
@@ -56,12 +49,7 @@ fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
 
 #[tracing::instrument]
 fn handle_check_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
-    let inputs_to_use = if inputs.is_empty() {
-        vec![PathBuf::from(".agent")]
-    } else {
-        inputs.to_vec()
-    };
-    validate_inputs(&inputs_to_use)?;
+    validate_inputs(inputs)?;
     Ok(())
 }
 
