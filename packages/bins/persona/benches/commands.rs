@@ -40,7 +40,7 @@ This is a dummy skill.
 }
 
 fn bench_commands(c: &mut Criterion) {
-    let file_counts = [10, 100, 1000, 10000];
+    let file_counts = [1, 10, 100];
 
     let mut group = c.benchmark_group("commands");
     // Increase sample size and measurement time for larger inputs
@@ -69,7 +69,7 @@ fn bench_commands(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("build", count), &inputs, |b, inputs| {
             b.iter(|| {
                 let entities = collect_entities(inputs).unwrap();
-                let _xml = generate_xml(&entities, inputs).unwrap();
+                let _xml = generate_xml(&entities, inputs, None).unwrap();
             })
         });
     }

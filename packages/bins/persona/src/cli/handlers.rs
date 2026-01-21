@@ -31,7 +31,8 @@ fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
 fn handle_check_command(inputs: &[PathBuf], agents_file: &Path) -> anyhow::Result<()> {
     let entities = collect_entities(inputs)?;
 
-    let expected_xml = generate_xml(&entities, inputs)?;
+    let root_header = read_root_header();
+    let expected_xml = generate_xml(&entities, inputs, root_header.as_deref())?;
 
     if !agents_file.exists() {
         anyhow::bail!(
@@ -59,7 +60,8 @@ fn handle_build_command(
     output: Option<&std::path::Path>,
 ) -> anyhow::Result<()> {
     let entities = collect_entities(inputs)?;
-    let xml_content = generate_xml(&entities, inputs)?;
+    let root_header = read_root_header();
+    let xml_content = generate_xml(&entities, inputs, root_header.as_deref())?;
 
     fs::write("AGENTS.md", xml_content)?;
     tracing::info!("Generated AGENTS.md");
@@ -112,4 +114,19 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+fn read_root_header() -> Option<String> {
+    let header_path = Path::new(".agent/HEADER.md");
+    if header_path.exists() {
+        match fs::read_to_string(header_path) {
+            Ok(content) => Some(content),
+            Err(e) => {
+                tracing::warn!("Failed to read .agent/HEADER.md: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    }
 }

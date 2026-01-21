@@ -139,7 +139,7 @@ mod tests {
 
         // Generate expected AGENTS.md content dynamically
         let entities = collect_entities(&inputs).unwrap();
-        let xml_content = generate_xml(&entities, &inputs).unwrap();
+        let xml_content = generate_xml(&entities, &inputs, None).unwrap();
 
         let agents_file = temp_dir.join("AGENTS.md");
         std::fs::write(&agents_file, xml_content).unwrap();
