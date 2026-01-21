@@ -6,7 +6,11 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 
-pub fn generate_xml(items: &[EntityOrHeader], inputs: &[PathBuf]) -> Result<String, PersonaError> {
+pub fn generate_xml(
+    items: &[EntityOrHeader],
+    inputs: &[PathBuf],
+    root_header: Option<&str>,
+) -> Result<String, PersonaError> {
     let mut root = NodeRef::new();
     for item in items {
         let path = item.path();
@@ -70,6 +74,13 @@ pub fn generate_xml(items: &[EntityOrHeader], inputs: &[PathBuf]) -> Result<Stri
     // Root element <persona-context>
     writer.write_event(Event::Start(BytesStart::new("persona-context")))?;
 
+    if let Some(header_content) = root_header {
+        let desc_elem = BytesStart::new("directions");
+        writer.write_event(Event::Start(desc_elem))?;
+        writer.write_event(Event::Text(BytesText::new(header_content.trim())))?;
+        writer.write_event(Event::End(BytesEnd::new("directions")))?;
+    }
+
     // Recurse
     write_node(&mut writer, &root)?;
 
@@ -103,11 +114,6 @@ fn write_node<W: Write>(writer: &mut Writer<W>, node: &NodeRef) -> Result<(), Pe
         if let Some(entity) = child_node.entity {
             // Attribute: path
             elem.push_attribute(("path", entity.path.to_string_lossy().as_ref()));
-        } else if let Some(header) = child_node.header {
-            // Attribute: path from header if no entity present?
-            // Or typically categories with headers don't have an entity file for themselves.
-            // We can put the header path.
-            elem.push_attribute(("path", header.path.to_string_lossy().as_ref()));
         }
 
         writer.write_event(Event::Start(elem))?;
@@ -229,7 +235,7 @@ mod tests {
 
         let items = vec![entity1, entity2];
 
-        let xml = generate_xml(&items, &inputs).unwrap();
+        let xml = generate_xml(&items, &inputs, None).unwrap();
 
         // BTreeMap sorts keys. personas < skills.
         let expected_xml = r#"<persona-context>
@@ -272,7 +278,7 @@ mod tests {
             body: "".to_string(),
         });
 
-        let xml = generate_xml(&[entity], &inputs).unwrap();
+        let xml = generate_xml(&[entity], &inputs, None).unwrap();
 
         // Should NOT escape
         assert!(xml.contains("<&>\"'"));
@@ -302,11 +308,11 @@ mod tests {
 
         let items = vec![header, child_entity];
 
-        let xml = generate_xml(&items, &inputs).unwrap();
+        let xml = generate_xml(&items, &inputs, None).unwrap();
 
         // Expectation:
         // <skills>
-        //   <coding path="...">
+        //   <coding>
         //     <directions>Coding Category Description</directions>
         //     <rust path="...">
         //       <description>Rust Skill</description>
@@ -314,7 +320,7 @@ mod tests {
         //   </coding>
         // </skills>
 
-        assert!(xml.contains("<coding path=\"./skills/coding/HEADER.md\">"));
+        assert!(xml.contains("<coding>"));
         assert!(xml.contains("<directions>Coding Category Description</directions>"));
         assert!(xml.contains("<rust path=\"./skills/coding/rust/SKILL.md\">"));
         assert!(xml.contains("<description>Rust Skill</description>"));

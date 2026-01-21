@@ -1,0 +1,1 @@
+These files provide additional context and skill for you (the agent) to use as needed to complete the given task. When you need the additional context, read the file contained at the path specified in the xml tag.

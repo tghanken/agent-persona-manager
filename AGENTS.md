@@ -1,5 +1,7 @@
 <persona-context>
+  <directions>These files provide additional context and skill for you (the agent) to use as needed to complete the given task. When you need the additional context, read the file contained at the path specified in the xml tag.</directions>
   <personas>
+    <directions>When starting a task, pick the most relevant persona to start with. If necessary, switch personas mid-task.</directions>
     <engineering>
       <architect path=".agent/personas/engineering/architect/PERSONA.md">
         <description>Expert in system design, high-level structure, and technical strategy.</description>
@@ -16,6 +18,7 @@
     </engineering>
   </personas>
   <skills>
+    <directions>These files provide additional skills for you (the agent) to use as needed to complete the given task.  Only use skills that are directly relevant to the task at hand.</directions>
     <conventional-commits path=".agent/skills/conventional-commits/SKILL.md">
       <description>Generates conventional commit messages for PRs and git commits.</description>
     </conventional-commits>
