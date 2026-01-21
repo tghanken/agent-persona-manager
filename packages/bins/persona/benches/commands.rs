@@ -55,20 +55,20 @@ fn bench_commands(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("check", count), &inputs, |b, inputs| {
             b.iter(|| {
-                collect_entities(inputs).unwrap();
+                collect_entities(inputs, 5000, 10000).unwrap();
             })
         });
 
         group.bench_with_input(BenchmarkId::new("list", count), &inputs, |b, inputs| {
             b.iter(|| {
-                let entities = collect_entities(inputs).unwrap();
+                let entities = collect_entities(inputs, 5000, 10000).unwrap();
                 print_hierarchy(&entities, inputs, std::io::sink()).unwrap();
             })
         });
 
         group.bench_with_input(BenchmarkId::new("build", count), &inputs, |b, inputs| {
             b.iter(|| {
-                let entities = collect_entities(inputs).unwrap();
+                let entities = collect_entities(inputs, 5000, 10000).unwrap();
                 let _xml = generate_xml(&entities, inputs, None).unwrap();
             })
         });

@@ -17,6 +17,12 @@ pub struct Cli {
     #[arg(short, long, action = clap::ArgAction::Count, global = true)]
     pub verbose: u8,
 
+    #[arg(long, global = true, default_value = "5000")]
+    pub warn_token_count: u64,
+
+    #[arg(long, global = true, default_value = "10000")]
+    pub error_token_count: u64,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -111,6 +117,20 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_token_args_parsing() {
+        let cli = Cli::parse_from([
+            "persona",
+            "--warn-token-count",
+            "100",
+            "--error-token-count",
+            "200",
+            "check",
+        ]);
+        assert_eq!(cli.warn_token_count, 100);
+        assert_eq!(cli.error_token_count, 200);
+    }
+
     fn setup_temp_dir(name: &str) -> PathBuf {
         let temp_dir = std::env::temp_dir().join(name);
         if temp_dir.exists() {
@@ -138,7 +158,7 @@ mod tests {
         std::fs::write(&skill_file, content).unwrap();
 
         // Generate expected AGENTS.md content dynamically
-        let entities = collect_entities(&inputs).unwrap();
+        let entities = collect_entities(&inputs, 5000, 10000).unwrap();
         let xml_content = generate_xml(&entities, &inputs, None).unwrap();
 
         let agents_file = temp_dir.join("AGENTS.md");
@@ -147,10 +167,48 @@ mod tests {
         let cli = Cli {
             input: inputs,
             verbose: 0,
+            warn_token_count: 5000,
+            error_token_count: 10000,
             command: Commands::Check { agents_file },
         };
 
         assert!(handle_cli(cli).is_ok());
+        std::fs::remove_dir_all(temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_handle_cli_check_fails_on_token_limit() {
+        use persona_core::{collect_entities, xml::generate_xml};
+
+        let temp_dir = setup_temp_dir("persona_test_check_fail");
+        let inputs_dir = temp_dir.join("inputs");
+        std::fs::create_dir(&inputs_dir).unwrap();
+        let inputs = vec![inputs_dir.clone()];
+
+        // Create a dummy skill
+        let skill_dir = inputs_dir.join("skills/test/myskill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        let skill_file = skill_dir.join("SKILL.md");
+        // Create large content
+        let body = "a".repeat(1000); // 1000 chars = 200 tokens
+        let content = format!("---\nname: myskill\ndescription: Test skill\n---\n{}", body);
+        std::fs::write(&skill_file, content).unwrap();
+
+        // Generate AGENTS.md
+        let entities = collect_entities(&inputs, 5000, 10000).unwrap();
+        let xml_content = generate_xml(&entities, &inputs, None).unwrap();
+        let agents_file = temp_dir.join("AGENTS.md");
+        std::fs::write(&agents_file, xml_content).unwrap();
+
+        let cli = Cli {
+            input: inputs,
+            verbose: 0,
+            warn_token_count: 5000,
+            error_token_count: 50, // Limit 50 tokens, content is > 200
+            command: Commands::Check { agents_file },
+        };
+
+        assert!(handle_cli(cli).is_err());
         std::fs::remove_dir_all(temp_dir).unwrap();
     }
 
@@ -161,6 +219,8 @@ mod tests {
         let cli = Cli {
             input: vec![temp_dir.clone()],
             verbose: 0,
+            warn_token_count: 5000,
+            error_token_count: 10000,
             command: Commands::List,
         };
         // This might print to stdout, but should return Ok
@@ -173,6 +233,8 @@ mod tests {
         let cli = Cli {
             input: vec![],
             verbose: 0,
+            warn_token_count: 5000,
+            error_token_count: 10000,
             command: Commands::Build { output: None },
         };
         assert!(handle_cli(cli).is_ok());
@@ -183,6 +245,8 @@ mod tests {
         let cli = Cli {
             input: vec![],
             verbose: 0,
+            warn_token_count: 5000,
+            error_token_count: 10000,
             command: Commands::Build {
                 output: Some(PathBuf::from("out")),
             },
