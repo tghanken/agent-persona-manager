@@ -8,31 +8,48 @@ use crate::cli::{Cli, Commands};
 pub fn handle_cli(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Commands::Check { agents_file } => {
-            handle_check_command(&cli.input, &agents_file)?;
+            handle_check_command(
+                &cli.input,
+                &agents_file,
+                cli.warn_token_count,
+                cli.error_token_count,
+            )?;
         }
         Commands::List => {
-            handle_list_command(&cli.input)?;
+            handle_list_command(&cli.input, cli.warn_token_count, cli.error_token_count)?;
         }
         Commands::Build { output } => {
-            handle_build_command(&cli.input, output.as_deref())?;
+            handle_build_command(
+                &cli.input,
+                output.as_deref(),
+                cli.warn_token_count,
+                cli.error_token_count,
+            )?;
         }
     }
     Ok(())
 }
 
 #[tracing::instrument]
-fn handle_list_command(inputs: &[PathBuf]) -> anyhow::Result<()> {
-    let entities = collect_entities(inputs)?;
+fn handle_list_command(inputs: &[PathBuf], warn: u64, error: u64) -> anyhow::Result<()> {
+    let entities = collect_entities(inputs, warn, error)?;
     print_hierarchy(&entities, inputs, std::io::stdout())?;
     Ok(())
 }
 
 #[tracing::instrument]
-fn handle_check_command(inputs: &[PathBuf], agents_file: &Path) -> anyhow::Result<()> {
-    let entities = collect_entities(inputs)?;
+fn handle_check_command(
+    inputs: &[PathBuf],
+    agents_file: &Path,
+    warn: u64,
+    error: u64,
+) -> anyhow::Result<()> {
+    let entities = collect_entities(inputs, warn, error)?;
 
     let root_header = read_root_header();
     let expected_xml = generate_xml(&entities, inputs, root_header.as_deref())?;
+
+    validate_token_count("AGENTS.md", &expected_xml, warn, error)?;
 
     if !agents_file.exists() {
         anyhow::bail!(
@@ -58,10 +75,14 @@ fn handle_check_command(inputs: &[PathBuf], agents_file: &Path) -> anyhow::Resul
 fn handle_build_command(
     inputs: &[PathBuf],
     output: Option<&std::path::Path>,
+    warn: u64,
+    error: u64,
 ) -> anyhow::Result<()> {
-    let entities = collect_entities(inputs)?;
+    let entities = collect_entities(inputs, warn, error)?;
     let root_header = read_root_header();
     let xml_content = generate_xml(&entities, inputs, root_header.as_deref())?;
+
+    validate_token_count("AGENTS.md", &xml_content, warn, error)?;
 
     fs::write("AGENTS.md", xml_content)?;
     tracing::info!("Generated AGENTS.md");
@@ -129,4 +150,26 @@ fn read_root_header() -> Option<String> {
     } else {
         None
     }
+}
+
+fn validate_token_count(name: &str, content: &str, warn: u64, error: u64) -> anyhow::Result<()> {
+    let count = content.chars().count();
+    let tokens = (count / 5) as u64;
+
+    if tokens > error {
+        let msg = format!(
+            "{} exceeds error limit of {} tokens (has {})",
+            name, error, tokens
+        );
+        tracing::error!("{}", msg);
+        anyhow::bail!(msg);
+    } else if tokens > warn {
+        tracing::warn!(
+            "{} exceeds warning limit of {} tokens (has {})",
+            name,
+            warn,
+            tokens
+        );
+    }
+    Ok(())
 }

@@ -215,6 +215,7 @@ mod tests {
                 other: serde_yaml::Value::Mapping(entity1_other),
             },
             body: "".to_string(),
+            char_count: 0,
         });
 
         let mut entity2_other = Mapping::new();
@@ -231,6 +232,7 @@ mod tests {
                 other: serde_yaml::Value::Mapping(entity2_other),
             },
             body: "".to_string(),
+            char_count: 0,
         });
 
         let items = vec![entity1, entity2];
@@ -276,6 +278,7 @@ mod tests {
                 other: serde_yaml::Value::Mapping(other),
             },
             body: "".to_string(),
+            char_count: 0,
         });
 
         let xml = generate_xml(&[entity], &inputs, None).unwrap();
@@ -304,6 +307,7 @@ mod tests {
                 other: serde_yaml::Value::Mapping(Mapping::new()),
             },
             body: "".to_string(),
+            char_count: 0,
         });
 
         let items = vec![header, child_entity];

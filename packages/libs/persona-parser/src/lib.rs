@@ -42,6 +42,7 @@ pub struct ParsedEntity {
     pub path: PathBuf,
     pub frontmatter: Frontmatter,
     pub body: String,
+    pub char_count: usize,
 }
 
 // New types for parsing stages
@@ -49,11 +50,13 @@ pub struct ValidatedPath(PathBuf);
 pub struct FileContent {
     path: ValidatedPath,
     content: String,
+    char_count: usize,
 }
 pub struct SplitContent {
     path: ValidatedPath,
     frontmatter_str: String,
     body: String,
+    char_count: usize,
 }
 
 pub trait PersonaParser {
@@ -100,7 +103,12 @@ impl ValidatedPath {
 impl FileContent {
     fn read(path: ValidatedPath) -> Result<Self, PersonaError> {
         let content = std::fs::read_to_string(&path.0)?;
-        Ok(Self { path, content })
+        let char_count = content.chars().count();
+        Ok(Self {
+            path,
+            content,
+            char_count,
+        })
     }
 }
 
@@ -111,6 +119,7 @@ impl SplitContent {
             path: input.path,
             frontmatter_str: frontmatter.to_string(),
             body: body.to_string(),
+            char_count: input.char_count,
         })
     }
 }
@@ -155,6 +164,7 @@ impl TryFrom<SplitContent> for ParsedEntity {
             path: split.path.0,
             frontmatter,
             body: split.body,
+            char_count: split.char_count,
         })
     }
 }
